@@ -22,7 +22,7 @@ class SimpleNamespace(object):
     def __init__(self, **kwargs):
         self.__dict__.update(kwargs)
 
-CONTINUEPOINT = 0.5
+CONTINUEPOINT = 0.1
 
 HALDANETRI, DEFECT = 'haldane and triangular', 'defect graphene'
 NONTRIVIAL, TRIVIAL, NONE = 'nontrivial', 'trivial', 'none'
@@ -129,7 +129,7 @@ def haldane_triangular():
         sys[kwant.builder.HoppingKind(neighbor, b, b)] = temp
         sys[kwant.builder.HoppingKind(neighbor, a, a)] = temp.conjugate()
 
-    kwant.plot(sys)
+    # kwant.plot(sys)
     # 2D PEC exception:
     if L == 0 and W == 0:
         return kwant.wraparound.wraparound(sys).finalized()
@@ -174,7 +174,7 @@ def localizer_gap(sys):
 
     p_text = ', '.join([f'{key}: {value:.3f}' if isinstance(value, float) else f'{key}: {value}' for key, value in model.items()])
     plt.figtext(0.5, 0.01, p_text, ha="center", va="bottom", fontsize=10, color="blue", bbox=dict(facecolor='lightblue', edgecolor='blue'))
-    filename = model['name'] + model['category']
+    filename = model['name'] + model['category']+f"t3={model['t3']:.2f}_tc={model['tc']:.2f}_t2={model['t2']:.2f}_m2={model['m2']:.2f}"
     plt.savefig(f'/content/localizer_gap_{filename}.png')
     plt.show()
     plt.close()
@@ -235,7 +235,7 @@ def eigenvalues_change(sys):
 
     str_zero_point = 'zero point: ' + ', '.join([f'{item:.4f}' for item in zero_point])
     plt.figtext(0.5, 1, str_zero_point, ha="center", va="top", fontsize=10, color="blue")
-    filename = model['name']+model['category']
+    filename = model['name']+model['category']+f"t3={model['t3']:.2f}_tc={model['tc']:.2f}_t2={model['t2']:.2f}_m2={model['m2']:.2f}"
     plt.savefig(f'/content/eigenvalues_change_{filename}.png')
     plt.show()
     plt.close()
@@ -308,18 +308,40 @@ def main_func(name, category):
 
 def band_structure():
     change_model(HALDANETRI, NONTRIVIAL)
-    # 改t2 t3 tc ......
     
-    model['L'], model['W'] = 0, 10
-    sys = model_builder()
-    plt.figure()
-    fig, ax = plt.subplots()
-    kwant.plotter.bands(sys, momenta = np.linspace(0, 2*pi, 200), ax=ax)
-    p_text = ', '.join([f'{key}: {value:.3f}' if isinstance(value, float) else f'{key}: {value}' for key, value in model.items()])
-    plt.figtext(0.5, 0.01, p_text, ha="center", va="bottom", fontsize=10, color="blue", bbox=dict(facecolor='lightblue', edgecolor='blue'))
-    filename = f"t3={model['t3']:.2f}_tc={model['tc']:.2f}_t2={model['t2']:.2f}"
-    plt.savefig(f'/content/ribbon_{filename}.png')
+    for (t3, tc, t2, m2) in [(0.1, 0.1, 0.8, -0.1),
+                         (0.1, 0.5, 1, -0.5),
+                         (0.5, 0.1, 0.5, -0.1),
+                         (1, 0.1, 0.1, -0.1),
+                         (1, 0.1, 1, -0.5),
+                         (1, 1, 1, -0.8)]:
+        model['t3'], model['tc'], model['t2'], model['m2'] = t3, tc, t2, m2
+        model['L'], model['W'] = 0, 10
+        sys = model_builder()
+        plt.figure()
+        fig, ax = plt.subplots()
+        kwant.plotter.bands(sys, momenta = np.linspace(0, 2*pi, 200), ax=ax)
+        p_text = ', '.join([f'{key}: {value:.3f}' if isinstance(value, float) else f'{key}: {value}' for key, value in model.items()])
+        plt.figtext(0.5, 0.01, p_text, ha="center", va="bottom", fontsize=10, color="blue", bbox=dict(facecolor='lightblue', edgecolor='blue'))
+        filename = f"t3={model['t3']:.2f}_tc={model['tc']:.2f}_t2={model['t2']:.2f}_m2={model['m2']:.2f}"
+        plt.savefig(f'/content/ribbon_{filename}.png')
+        
+def different_haldane():
+    change_model(HALDANETRI, NONTRIVIAL)
+    
+    for (t3, tc, t2, m2) in [(0.1, 0.1, 0.8, -0.1),
+                         (0.1, 0.5, 1, -0.5),
+                         (0.5, 0.1, 0.5, -0.1),
+                         (1, 0.1, 0.1, -0.1),
+                         (1, 0.1, 1, -0.5),
+                         (1, 1, 1, -0.8)]:
+        model['t3'], model['tc'], model['t2'], model['m2'] = t3, tc, t2, m2
+        sys = model_builder()
+        
+        # change_para(GAP)
+        # localizer_gap(sys)
 
-# for (name, category) in [(HALDANETRI, NONTRIVIAL), (HALDANETRI, TRIVIAL), (DEFECT, NONE)]:
-#   main_func(name, category)
-band_structure()
+        change_para(CHANGE)
+        eigenvalues_change(sys)
+
+different_haldane()

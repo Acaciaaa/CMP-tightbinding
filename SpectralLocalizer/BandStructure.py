@@ -67,15 +67,12 @@ def band_periodic(**kwargs):
 
     p_text = ', '.join([f'{key}: {value:.3f}' if isinstance(value, float) else f'{key}: {value}' for key, value in kwargs.items()])
     plt.figtext(0.5, 0.01, p_text, ha="center", va="bottom", fontsize=10, color="blue", bbox=dict(facecolor='lightblue', edgecolor='blue'))
-    filename = f"t3={kwargs['t3']:.2f}_tc={kwargs['tc']:.2f}_t2={kwargs['t2']:.2f}"
+    filename = f"t3={kwargs['t3']:.2f}_tc={kwargs['tc']:.2f}_t2={kwargs['t2']:.2f}_m2={kwargs['m2']:.2f}"
     plt.savefig(f'./SpectralLocalizer/band/ribbon_{filename}.png')
     
 def band_ribbon(**kwargs):
     tmp_model = model_build(**kwargs)
     my_model=tmp_model.cut_piece(10,0,glue_edgs=False)
-    
-    fig, ax = my_model.visualize(0, 1)
-    plt.show()
     
     (k_vec,k_dist,k_node)=my_model.k_path([[0.0], [1.0]],200,report=False)
     
@@ -91,8 +88,14 @@ def band_ribbon(**kwargs):
     
     p_text = ', '.join([f'{key}: {value:.3f}' if isinstance(value, float) else f'{key}: {value}' for key, value in kwargs.items()])
     plt.figtext(0.5, 0.01, p_text, ha="center", va="bottom", fontsize=10, color="blue", bbox=dict(facecolor='lightblue', edgecolor='blue'))
-    filename = f"t3={kwargs['t3']:.2f}_tc={kwargs['tc']:.2f}_t2={kwargs['t2']:.2f}"
+    filename = f"t3={kwargs['t3']:.2f}_tc={kwargs['tc']:.2f}_t2={kwargs['t2']:.2f}_m2={kwargs['m2']:.2f}"
     plt.savefig(f'./SpectralLocalizer/band/periodic_{filename}.png')
-
-# band_periodic(m=0.0, t1=1.0, t2=0.2, t3=0.3, tc=0.5, m2=-0.35)
-band_ribbon(m=0.0, t1=1.0, t2=0.2, t3=0.3, tc=0.5, m2=-0.35)
+    
+for (t3, tc, t2, m2) in [(0.1, 0.1, 0.8, -0.1),
+                         (0.1, 0.5, 1, -0.5),
+                         (0.5, 0.1, 0.5, -0.1),
+                         (1, 0.1, 0.1, -0.1),
+                         (1, 0.1, 1, -0.5),
+                         (1, 1, 1, -0.8)]:
+        band_periodic(m=0.0, t1=1.0, t2=t2, t3=t3, tc=tc, m2=m2)
+        band_ribbon(m=0.0, t1=1.0, t2=t2, t3=t3, tc=tc, m2=m2)
