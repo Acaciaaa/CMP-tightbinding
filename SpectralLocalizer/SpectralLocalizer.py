@@ -192,7 +192,8 @@ def haldane_triangular():
         sys[kwant.builder.HoppingKind(neighbor, b, b)] = temp
         sys[kwant.builder.HoppingKind(neighbor, a, a)] = temp.conjugate()
 
-    kwant.plot(sys)
+    # kwant.plot(sys)
+    
     # 2D PEC exception: currently useless
     if L == 0 and W == 0:
         return kwant.wraparound.wraparound(sys).finalized()
@@ -411,7 +412,20 @@ def different_haldane():
                 change_para(CHANGE)
                 eigenvalues_change(sys)
 
+import os
+import shutil
+def sync_png_files():
+    source_dir = '/content'
+    target_dir = '/content/drive/My Drive/Colab Notebooks/Synced Images'
+    os.makedirs(target_dir, exist_ok=True)
+    for file_name in os.listdir(source_dir):
+            if file_name.endswith('.png'): 
+                source_path = os.path.join(source_dir, file_name)
+                destination_path = os.path.join(target_dir, file_name)
+                
+                shutil.copy(source_path, destination_path)
 # band_structure()
 different_haldane()
+sync_png_files()
 # main_func(HALDANETRI, NONTRIVIAL)
 # main_func(DEFECT, NONE)
