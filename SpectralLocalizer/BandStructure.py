@@ -14,7 +14,10 @@ import matplotlib.pyplot as plt
 import os
 import sys
 
-def model_build(m, t1, t2, t3, tc, m2):
+m = 0.0
+t1 = 1.0
+m2 = -0.35
+def model_build(t3, t2, tc):
     lat=[[1.0,0.0],[0.5,np.sqrt(3.0)/2.0]]
     orb=[[0, 0],[-1/3, 2/3], [1/3, 1/3]]
 
@@ -67,8 +70,9 @@ def band_periodic(**kwargs):
 
     p_text = ', '.join([f'{key}: {value:.3f}' if isinstance(value, float) else f'{key}: {value}' for key, value in kwargs.items()])
     plt.figtext(0.5, 0.01, p_text, ha="center", va="bottom", fontsize=10, color="blue", bbox=dict(facecolor='lightblue', edgecolor='blue'))
-    filename = f"t3={kwargs['t3']:.2f}_tc={kwargs['tc']:.2f}_t2={kwargs['t2']:.2f}_m2={kwargs['m2']:.2f}"
+    filename = f"t3={kwargs['t3']:.2f}_tc={kwargs['tc']:.2f}_t2={kwargs['t2']:.2f}"
     plt.savefig(f'./SpectralLocalizer/band/ribbon_{filename}.png')
+    plt.close()
     
 def band_ribbon(**kwargs):
     tmp_model = model_build(**kwargs)
@@ -88,14 +92,15 @@ def band_ribbon(**kwargs):
     
     p_text = ', '.join([f'{key}: {value:.3f}' if isinstance(value, float) else f'{key}: {value}' for key, value in kwargs.items()])
     plt.figtext(0.5, 0.01, p_text, ha="center", va="bottom", fontsize=10, color="blue", bbox=dict(facecolor='lightblue', edgecolor='blue'))
-    filename = f"t3={kwargs['t3']:.2f}_tc={kwargs['tc']:.2f}_t2={kwargs['t2']:.2f}_m2={kwargs['m2']:.2f}"
+    filename = f"t3={kwargs['t3']:.2f}_tc={kwargs['tc']:.2f}_t2={kwargs['t2']:.2f}"
     plt.savefig(f'./SpectralLocalizer/band/periodic_{filename}.png')
-    
-for (t3, tc, t2, m2) in [(0.1, 0.1, 0.8, -0.1),
-                         (0.1, 0.5, 1, -0.5),
-                         (0.5, 0.1, 0.5, -0.1),
-                         (1, 0.1, 0.1, -0.1),
-                         (1, 0.1, 1, -0.5),
-                         (1, 1, 1, -0.8)]:
-        band_periodic(m=0.0, t1=1.0, t2=t2, t3=t3, tc=tc, m2=m2)
-        band_ribbon(m=0.0, t1=1.0, t2=t2, t3=t3, tc=tc, m2=m2)
+    plt.close()
+
+def main_func(**kwargs):
+    band_periodic(**kwargs)
+    band_ribbon(**kwargs)
+
+for t3 in [0.1, 3]:
+        for t2 in [0.1, 3]:
+            for tc in [0.1, 3]:
+                main_func(t3=t3, t2=t2, tc=tc)
