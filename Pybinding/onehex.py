@@ -1,92 +1,103 @@
 import pybinding as pb
 import numpy as np
 import matplotlib.pyplot as plt
-import math
+from math import sqrt, pi
+import cmath
 from pybinding.repository import graphene
 
-def monolayer_graphene(**kwargs):
-    a = math.sqrt(3)   # [nm] unit cell length
-    a_cc = 1  # [nm] carbon-carbon distance
-    t1 = -1      # [eV] nearest neighbour hopping
+cc = 1.0
+m = 0.0
     
-    t2 = 1*np.exp((1.j)*np.pi/2.)
-    t2c= t2.conjugate()
+t1 = 1.0
+    
+def monolayer_graphene(tc, **kwargs):
+    t2 = tc*cmath.exp((1.j)*pi/2.)
+    t2c = t2.conjugate()
+    
+    lat = pb.Lattice(a1=[cc, 0], a2=[cc/2, cc* sqrt(3)/2 ])
 
-    lat = pb.Lattice(a1=[a, 0],
-                     a2=[a/2, a/2 * math.sqrt(3)])
-    lat.add_sublattices(('A', [0, -a_cc/2], 0),
-                        ('B', [0,  a_cc/2], 0))
-    
+    lat.add_sublattices(('a', [cc/2, -cc / (2*sqrt(3))], m),
+                        ('b', [cc/2, cc / (2*sqrt(3))], -m))
+
     lat.register_hopping_energies({
         't1': kwargs.get('t1', t1),
         't2': kwargs.get('t2', t2),
         't2c': kwargs.get('t2c', t2c),
     })
-    lat.add_hoppings(
-        ([0,  0], 'A', 'B', 't1'),
-        ([1, -1], 'A', 'B', 't1'),
-        ([0, -1], 'A', 'B', 't1')
-    )
-    lat.add_hoppings(
-        ([1,  0], 'A', 'A', 't2'),
-        ([0, -1], 'A', 'A', 't2'),
-        ([-1, 1], 'A', 'A', 't2'),
-        ([1,  0], 'B', 'B', 't2c'),
-        ([0, -1], 'B', 'B', 't2c'),
-        ([-1, 1], 'B', 'B', 't2c')
-    )
+
+    neighbors_graphene = [[0, 0], [0, -1], [1, -1]]
+    for neighbor in neighbors_graphene:
+        lat.add_hoppings((neighbor, 'a', 'b', -t1))
+
+    neighbors_imag = [(-1, 1), (0, -1), (1, 0)]
+    for neighbor in neighbors_imag:
+        lat.add_hoppings((neighbor, 'b', 'b', t2))
+        lat.add_hoppings((neighbor, 'a', 'a', t2c))
+            
     return lat
 
-epsilon = 0.02
+def vertex(L, W):
+    return (L*cc/2, ((W-1)/2*1.5+1)*cc/sqrt(3))
+
+def rectangle(L, W):
+    (x0, y0) = vertex(L, W)
+    x, y = x0+0.1, y0+0.1
+    return pb.Polygon([[x, y], [x, -y], [-x, -y], [-x, y]])
+
+epsilon = 0.7
 def ifclose(n, target):
     return np.abs(n - target) < epsilon
 
 def add_one_haldane():
     @pb.hopping_energy_modifier
     def modify_hopping(energy, x1, y1, x2, y2, hop_id):
-        # print('x1', x1, 'y1', y1, hop_id)
-        # print('energy', energy)
-
-        if hop_id == 't2':
-            condition1 = ifclose(x1, 0) & ifclose(y1, -0.5) & ifclose(x2, math.sqrt(3)) & ifclose(y2, -0.5)
-            condition2 = ifclose(x1, math.sqrt(3)) & ifclose(y1, -0.5) & ifclose(x2, math.sqrt(3)/2) & ifclose(y2, 1)
-            condition3 = ifclose(x1, math.sqrt(3)/2) & ifclose(y1, 1) & ifclose(x2, 0) & ifclose(y2, -0.5)
-            energy[~condition1 & ~condition2 & ~condition3] = 0
-        if hop_id == 't2c':
-            condition1 = ifclose(x1, 0) & ifclose(y1, 0.5) & ifclose(x2, math.sqrt(3)) & ifclose(y2, 0.5)
-            condition2 = ifclose(x1, math.sqrt(3)) & ifclose(y1, 0.5) & ifclose(x2, math.sqrt(3)/2) & ifclose(y2, -1)
-            condition3 = ifclose(x1, math.sqrt(3)/2) & ifclose(y1, -1) & ifclose(x2, 0) & ifclose(y2, 0.5)
-            energy[~condition1 & ~condition2 & ~condition3] = 0
-            
-        # print('energy', energy)
+        condition = ifclose(x1, 0) & ifclose(y1, 0) & ifclose(x2, 0) & ifclose(y2, 0)
+        if hop_id == 't2' or hop_id == 't2c':
+            energy[~condition] = 0
         return energy
     return modify_hopping
 
-model = pb.Model(
-    monolayer_graphene(),
-    #add_one_haldane(),
-    pb.primitive(a1=20),
-    pb.translational_symmetry(a1=False)
-)
-# fig, ax = plt.subplots()
-# model.plot()
-# plt.show()
+def model_builder(L, W, tc):
+    model = pb.Model(
+        monolayer_graphene(tc),
+        add_one_haldane(),
+        rectangle(L, W),
+    )
+    return model
 
-# solver = pb.solver.lapack(model)
-# left = [-2*math.pi / (3*math.sqrt(3)), 2*math.pi / 3]
-# K1 = [-4*math.pi / (3*math.sqrt(3)), 0]
-# right = [-2*math.pi / (3*math.sqrt(3)), -2*math.pi / 3]
+def whole_ldos(L, W, tc):
+    model = model_builder(L, W, tc)
 
-# bands = solver.calc_bands(left, K1, right)
-# bands.plot(point_labels=['K\'', 'K', 'K\''])
-# plt.show()
+    solver = pb.solver.lapack(model)
+    ldos = solver.calc_spatial_ldos(energy=0, broadening=0.2)  # eV
+    plt.figure()
+    ldos.plot(site_radius=(0.2, 0.2))
+    pb.pltutils.colorbar(label="LDOS")
+    plt.savefig(f'./Pybinding/LDOS_L={L}_W={W}_tc={tc:.2f}.png') 
+    plt.close()
+    
+# whole_ldos(13, 13, 1)
 
-solver = pb.solver.lapack(model)
-ldos = solver.calc_spatial_ldos(energy=0, broadening=0.2)  # eV
-fig, ax = plt.subplots()
-ax.set_xlim([-10, 10])
-ax.set_ylim([-10, 10])
-ldos.plot(site_radius=(0.2, 0.5))
-pb.pltutils.colorbar(label="LDOS")
-plt.savefig('LDOS2.png') 
-plt.close(fig)
+def change_ldos(L, W):
+    num_sample = 500
+    tc_list = np.linspace(0.6, 1.8, num_sample)
+    first_list, second_list = np.zeros((num_sample)), np.zeros((num_sample))
+    for index, tc in enumerate(tc_list):
+        model = model_builder(L, W, tc)
+        solver = pb.solver.lapack(model)
+        first = solver.calc_ldos(energies=0, broadening=0.2, position=[0, 1/sqrt(3)])
+        first_list[index] = first.data[0]
+        second = solver.calc_ldos(energies=0, broadening=0.2, position=[0, 2/sqrt(3)])
+        second_list[index] = second.data[0]
+        
+    plt.figure()
+    plt.plot(tc_list, first_list)
+    first_max = f"{tc_list[np.argmax(first_list)]:.3f}"
+    plt.plot(tc_list, second_list)
+    second_max = f"{tc_list[np.argmax(second_list)]:.3f}"
+    plt.figtext(0.5, 0.9, 'first: '+first_max+' second: '+second_max, ha="center", va="top", fontsize=10, color="blue")
+    plt.savefig(f'./Pybinding/Change_L={L}_W={W}.png')
+    plt.show()
+    plt.close()
+        
+change_ldos(13, 13)
