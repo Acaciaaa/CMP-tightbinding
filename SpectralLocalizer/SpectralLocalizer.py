@@ -7,7 +7,7 @@ from scipy.linalg import kron
 import pylab as py
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
-import sys
+import sys as system
 import cmath
 from math import sqrt, pi
 import warnings
@@ -26,7 +26,7 @@ class SimpleNamespace(object):
 CONTINUEPOINT = 0.1
 
 HALDANETRI, DEFECT, PYBINDING = 'haldane and triangular', 'defect graphene', 'pybinding'
-NONTRIVIAL, TRIVIAL, NONE = 'nontrivial', 'trivial', 'none'
+NONTRIVIAL, TRIVIAL, SINGLE, CLUSTER, NONE = 'nontrivial', 'trivial', 'single', '7 hexagons', 'none'
 model = dict(name = NONE,  category = NONE,
          cc = 1.0, # cell-cell distance not site-site distance
          m = 1.0, t1 = 1/2, tc = 1/2, # on-site difference -> 2m, 1st neighbor -> t1, 2nd neighbor -> t2
@@ -52,7 +52,7 @@ def defect_graphene():
     cc = model['cc']
     lat = kwant.lattice.general([(cc, 0), (cc / 2, cc * sqrt(3) / 2)],
                                  [(cc/2, -cc / (2*sqrt(3))), (cc/2, cc / (2 * sqrt(3)))],
-                                 ['a', 'b'])
+                                 ['a', 'b'], norbs=1)
     a, b = lat.sublattices
 
     m = model['m']
@@ -64,7 +64,7 @@ def defect_graphene():
         return 0
 
     L, W = model['L'], model['W']
-    (x, y) = vertex(L, W)
+    (x, y) = rectangle_vertex(L, W)
     sys = kwant.Builder()
     sys[lat.shape((lambda pos: (-x<=pos[0]<=x) and (-y<=pos[1]<= y)), (0, 0))] = onsite
 
@@ -75,29 +75,82 @@ def defect_graphene():
         sys[kwant.builder.HoppingKind(neighbor, b, a)] = -t1
 
     temp = tc*cmath.exp((1.j)*pi/2.)
-    neighbors_a = [(0, 0), (-1, 1), (-1, 0)]
-    for sour, tar in zip(neighbors_a, neighbors_a[1:]+neighbors_a[:1]):
-        sys[a(tar[0], tar[1]), a(sour[0], sour[1])] = temp
-    neighbors_b = [(0, 0), (-1, 0), (0, -1)]
-    for sour, tar in zip(neighbors_b, neighbors_b[1:]+neighbors_b[:1]):
-        sys[b(tar[0], tar[1]), b(sour[0], sour[1])] = temp
-
+    category = model['category']
+    
+    if category == SINGLE:
+        neighbors_a = [(0, 0), (-1, 1), (-1, 0)]
+        for sour, tar in zip(neighbors_a, neighbors_a[1:]+neighbors_a[:1]):
+            sys[a(tar[0], tar[1]), a(sour[0], sour[1])] = temp
+        neighbors_b = [(0, 0), (-1, 0), (0, -1)]
+        for sour, tar in zip(neighbors_b, neighbors_b[1:]+neighbors_b[:1]):
+            sys[b(tar[0], tar[1]), b(sour[0], sour[1])] = temp
+        
+    elif category == CLUSTER:
+        mark = [0, -1, -2]
+        for row_index, a2 in enumerate(mark):
+            for column_index, a1 in enumerate(mark):
+                if row_index == column_index == 0 or row_index == column_index == 2:
+                    continue
+                neighbors_b = [(a1+1, a2), (a1+1, a2+1), (a1, a2+1)]
+                for sour, tar in zip(neighbors_b, neighbors_b[1:]+neighbors_b[:1]):
+                    sys[b(tar[0], tar[1]), b(sour[0], sour[1])] = temp
+                neighbors_a = [(a1, a2+2), (a1, a2+1), (a1+1, a2+1)]
+                for sour, tar in zip(neighbors_a, neighbors_a[1:]+neighbors_a[:1]):
+                    sys[a(tar[0], tar[1]), a(sour[0], sour[1])] = temp
+    else:
+        system.exit()
+        
     # kwant.plot(sys)
     return sys.finalized()
-
+    
+def defect_current(sys, num_states = 20, max_E = 0.5):
+    H = sys.hamiltonian_submatrix(sparse=False)
+    J = kwant.operator.Current(sys)
+    combined_current = None
+    
+    if num_states is not None:
+        evals, evecs = eigsh(H, k=num_states, sigma=0)
+        max_E_label = 'max energy: '+ f'{max(evals, key=abs):.4f}'
+        for i in range(num_states):
+            current = J(evecs[:, i])
+            if combined_current is None:
+                combined_current = current
+            else:
+                combined_current += current
+    else:
+        evals, evecs = eigh(H)
+        max_E_label = 'max energy: '+ f'{max_E:.4f}'
+        for i, e in enumerate(evals):
+            if abs(e) < max_E:
+                current = J(evecs[:, i])
+                if combined_current is None:
+                    combined_current = current
+                else:
+                    combined_current += current
+        
+    plt.figure()
+    kwant.plotter.current(sys, combined_current, colorbar=True, show = False)
+    label = pick_label(model['name'])
+    plt.figtext(0.5, 0.98, label, ha="center", va="top", fontsize=10, color="blue")
+    plt.figtext(0.5, 0.93, max_E_label, ha="center", va="top", fontsize=10, color="blue")
+    plt.xlim(-3, 3)
+    plt.ylim(-3, 3)
+    plt.show()
+    plt.close()
+      
 # import pybinding as pb
 
-def vertex(L, W):
+def rectangle_vertex(L, W):
     cc = model['cc']
     return (L*cc/2, ((W-1)/2*1.5+1)*cc/sqrt(3))
 
 def pick_label(name):
     if name == HALDANETRI:
-        return name + '_' + f"t3={model['t3']:.2f}_tc={model['tc']:.2f}_t2={model['t2']:.2f}_L={model['L']}_W={model['W']}"
+        return name + '_' + model['category'] + '_' + f"t3={model['t3']:.2f}_tc={model['tc']:.2f}_t2={model['t2']:.2f}_L={model['L']}_W={model['W']}"
     if name == DEFECT:
-        return name + '_' + f"tc={model['tc']:.2f}_L={model['L']}_W={model['W']}"
+        return name + '_' + model['category'] + '_' + f"tc={model['tc']:.2f}_L={model['L']}_W={model['W']}"
     else:
-        sys.exit()
+        system.exit()
 
 def haldane_triangular_pybinding():
 #     cc = model['cc']
@@ -173,7 +226,7 @@ def haldane_triangular():
         return m2
 
     L, W = model['L'], model['W']
-    (x, y) = vertex(L, W)
+    (x, y) = rectangle_vertex(L, W)
     if L == 0 and W == 0: # PEC: currently useless
         sys = kwant.Builder()
         sys[lat.shape((lambda pos: True), (0, 0))] = onsite
@@ -264,7 +317,7 @@ from scipy.interpolate import interp1d
 from scipy.optimize import fsolve
 
 def sigma_change():# precondition: eigenvalues_change already cross 0
-    change_model(DEFECT, NONE)
+    change_model(DEFECT, SINGLE)
     sigma_value = []
     tc_value = np.linspace(0.8, 1.3, 100)
     for tc in tc_value:
@@ -345,19 +398,18 @@ def eigenvalues_change(sys):
             zero_point.append((v_coords[index]+v_coords[index+1])/2)
 
         plt.plot(v_coords, line, label=f'Eig {i+1}')
-    plt.xlabel(xlabel)
     plt.ylabel('localizer eigenvalues')
     label = pick_label(model['name'])
     plt.figtext(0.5, 0.01, label, ha="center", va="bottom", fontsize=10, color="blue")
 
     str_zero_point = 'zero point: ' + ', '.join([f'{item:.3f}' for item in zero_point])
-    plt.figtext(0.5, 1, str_zero_point, ha="center", va="top", fontsize=10, color="blue")
-    plt.figtext(0.5, 0.9, xlabel, ha="center", va="top", fontsize=10, color="blue")
+    plt.figtext(0.5, 0.96, str_zero_point, ha="center", va="top", fontsize=10, color="blue")
+    plt.figtext(0.5, 0.92, xlabel, ha="center", va="top", fontsize=10, color="blue")
     plt.savefig(f'/content/eigenvalues_change_{label}_{xlabel}.png')
     plt.show()
     plt.close()
 
-def change_model(name, category='none'):
+def change_model(name, category):
     if name==HALDANETRI or name==PYBINDING:
         if category==NONTRIVIAL:
             model.update(dict(name = name, category = category,
@@ -378,16 +430,16 @@ def change_model(name, category='none'):
     elif name==DEFECT:
         model.update(dict(name=name, category = category,
                       cc = 1.0,
-                      m = 0.0, t1 = 1.0, tc = 0.8,
+                      m = 0.0, t1 = 1.0, tc = 1.0,
                       kappa = 1.0,
                       L=13, W=13))
     else:
         print('change_model error')
-        sys.exit()
+        system.exit()
 
 def change_para(func):
     L, W, cc = model['L'], model['W'], model['cc']
-    (x, y) = vertex(L, W)
+    (x, y) = rectangle_vertex(L, W)
     print('x=', x, ', y=', y)
 
     if func==GAP:
@@ -408,13 +460,14 @@ def change_para(func):
                              x_min = 0, x_max = 0,
                              num_eigvals = 20,))
         elif model['name'] == DEFECT: # x_fix = 0
+            # y_min = -const*cc, y_max = const*cc
             para.update(dict(func = func,
-                             y_min = -2*cc, y_max = 2*cc, num_cc=200,
+                             y_min = -3*cc, y_max = 3*cc, num_cc=200,
                              x_min = 0, x_max = 0,
-                             num_eigvals = 20,))
+                             num_eigvals = 6,))
     else:
         print('change_para error')
-        sys.exit()
+        system.exit()
 
 def main_func(name, category):
     change_model(name, category)
@@ -439,7 +492,7 @@ def band_structure():
     plt.figure()
     fig, ax = plt.subplots()
     kwant.plotter.bands(sys, momenta = np.linspace(0, 2*pi, 200), ax=ax)
-    label = model['name']+model['category']+f"t3={model['t3']:.2f}_tc={model['tc']:.2f}_t2={model['t2']:.2f}"
+    label = pick_label(model['name'])
     plt.figtext(0.5, 0.01, label, ha="center", va="bottom", fontsize=10, color="blue", bbox=dict(facecolor='lightblue', edgecolor='blue'))
     plt.show()
     plt.savefig(f'/content/ribbon_{label}.png')
@@ -474,10 +527,9 @@ def sync_png_files():
 # band_structure()
 #different_haldane()
 # sync_png_files()
-main_func(DEFECT, NONE)
-# change_model(DEFECT, NONE)
-# for i in np.linspace(0.8, 1.3, 10):
-#     model['tc'] = i
-#     sys = model_builder()
-#     change_para(CHANGE)
-#     eigenvalues_change(sys)
+
+change_model(DEFECT, CLUSTER)
+for tc in [0.5, 1.2, 1.6, 1.7, 1.9, 2.0, 4.0]:
+  model['tc'] = tc
+  sys = model_builder()
+  defect_current(sys, num_states=None, max_E=0.5)

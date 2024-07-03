@@ -73,31 +73,38 @@ def whole_ldos(L, W, tc):
     plt.figure()
     ldos.plot(site_radius=(0.2, 0.2))
     pb.pltutils.colorbar(label="LDOS")
-    plt.savefig(f'./Pybinding/LDOS_L={L}_W={W}_tc={tc:.2f}.png') 
+    plt.figtext(0.5, 1, f'L={L}_W={W}_tc={tc:.2f}.png', ha="center", va="top", fontsize=10, color="black")
+    plt.savefig(f'./Pybinding/LDOS/LDOS_L={L}_W={W}_tc={tc:.2f}.png') 
     plt.close()
     
-# whole_ldos(13, 13, 1)
+# for tc in [0, 0.1, 0.4, 0.6, 0.8, 1, 1.1, 1.3, 3]:
+#     whole_ldos(13, 13, tc)
 
 def change_ldos(L, W):
     num_sample = 500
-    tc_list = np.linspace(0.6, 1.8, num_sample)
-    first_list, second_list = np.zeros((num_sample)), np.zeros((num_sample))
+    tc_list = np.linspace(0.3, 1.8, num_sample)
+    A_list, B_list = np.zeros((num_sample)), np.zeros((num_sample))
     for index, tc in enumerate(tc_list):
         model = model_builder(L, W, tc)
         solver = pb.solver.lapack(model)
-        first = solver.calc_ldos(energies=0, broadening=0.2, position=[0, 1/sqrt(3)])
-        first_list[index] = first.data[0]
-        second = solver.calc_ldos(energies=0, broadening=0.2, position=[0, 2/sqrt(3)])
-        second_list[index] = second.data[0]
+        A = solver.calc_ldos(energies=0, broadening=0.2, position=[0, 1/sqrt(3)])
+        A_list[index] = A.data[0]
+        B = solver.calc_ldos(energies=0, broadening=0.2, position=[0, 2/sqrt(3)])
+        B_list[index] = B.data[0]
         
     plt.figure()
-    plt.plot(tc_list, first_list)
-    first_max = f"{tc_list[np.argmax(first_list)]:.3f}"
-    plt.plot(tc_list, second_list)
-    second_max = f"{tc_list[np.argmax(second_list)]:.3f}"
-    plt.figtext(0.5, 0.9, 'first: '+first_max+' second: '+second_max, ha="center", va="top", fontsize=10, color="blue")
+    plt.plot(tc_list, A_list)
+    A_max = f"{tc_list[np.argmax(A_list)]:.3f}"
+    A_derivative_max = f"{tc_list[np.argmax(np.diff(A_list))]:.3f}"
+    
+    plt.plot(tc_list, B_list)
+    B_max = f"{tc_list[np.argmax(B_list)]:.3f}"
+    B_derivative_max = f"{tc_list[np.argmax(np.diff(B_list))]:.3f}"
+    
+    plt.figtext(0.5, 0.98, 'max - A: '+A_max+' B: '+B_max, ha="center", va="top", fontsize=10, color="blue")
+    plt.figtext(0.5, 0.93, 'derivative max - A: '+A_derivative_max+' B: '+B_derivative_max, ha="center", va="top", fontsize=10, color="blue")
     plt.savefig(f'./Pybinding/Change_L={L}_W={W}.png')
     plt.show()
     plt.close()
         
-change_ldos(13, 13)
+change_ldos(14, 13)
