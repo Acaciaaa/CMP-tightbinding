@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 import sys as system
 import cmath
-from math import sqrt, pi
+from math import sqrt, pi, sin, cos
 import warnings
 
 '''Defining Pauli matrices'''
@@ -103,51 +103,132 @@ def defect_graphene():
     # kwant.plot(sys)
     return sys.finalized()
     
-def defect_current(sys, num_states = 20, max_E = 0.5):
-    H = sys.hamiltonian_submatrix(sparse=False)
-    J = kwant.operator.Current(sys)
-    combined_current = None
+def current_Jr(name, category, max_E = 0.5):
+    max_E_label = 'max energy: '+ f'{max_E:.3f}'
     
-    if num_states is not None:
-        evals, evecs = eigsh(H, k=num_states, sigma=0)
-        max_E_label = 'max energy: '+ f'{max(evals, key=abs):.4f}'
-        for i in range(num_states):
-            current = J(evecs[:, i])
-            if combined_current is None:
-                combined_current = current
-            else:
-                combined_current += current
-    else:
+    def edge_info(sys):
+        distance = {}
+        pos_info = [] # [[dot1, r1], [dot2, r2]]
+        r_index = 0
+        for head, tail in sys.graph:
+            p1, p2 = sys.sites[head].pos, sys.sites[tail].pos
+            unit_vector = (p2-p1)/np.linalg.norm(p2-p1)
+            p3 = (p1+p2)/2
+            theta = np.arctan2(p3[1], p3[0])
+            thetahat = [-sin(theta), cos(theta)]
+            
+            r = round(np.linalg.norm(p3), 3)
+            if r not in distance:
+                distance[r] = r_index
+                r_index += 1
+            pos_info.append([np.dot(unit_vector, thetahat), r])
+        return distance, pos_info
+    
+    def current_info(sys):
+        H = sys.hamiltonian_submatrix(sparse=False)
+        J = kwant.operator.Current(sys)
         evals, evecs = eigh(H)
-        max_E_label = 'max energy: '+ f'{max_E:.4f}'
+        sum_current = None
         for i, e in enumerate(evals):
             if abs(e) < max_E:
                 current = J(evecs[:, i])
-                if combined_current is None:
-                    combined_current = current
+                if sum_current is None:
+                    sum_current = current
                 else:
-                    combined_current += current
+                    sum_current += current
+        return sum_current
+    
+    def magnitude_info():
+        temp = [None] * len(distance)
+        magnitude = np.zeros(len(distance))
+        for index, current in enumerate(sum_current):
+            result = current * pos_info[index][0]
+            r = pos_info[index][1]
+            if temp[distance[r]] is None:
+                temp[distance[r]] = [result]
+            else:
+                temp[distance[r]].append(result)
+        for key, value in distance.items():
+            magnitude[value] = np.sum(temp[value])
+        return magnitude
+    
+    change_model(name, category)
+    temp_sys = model_builder()
+    distance, pos_info = edge_info(temp_sys)
+    sort_r = sorted(distance.keys())
+    num_tc = 500
+    data = np.zeros((num_tc, len(distance)))
+    tc_list = np.linspace(0.8, 1.3, num_tc)
+    for index, tc in enumerate(tc_list):
+        model['tc'] = tc
+        sys = model_builder()
+        sum_current = current_info(sys)
+        magnitude = magnitude_info()
+        data[index, :] = magnitude
+    # r最小为例子
+    label = pick_label(model['name'], iftc = False)
+    for i, r in enumerate(sort_r):
+        plt.figure()
+        y_list = data[:,distance[r]]
+        plt.plot(tc_list, y_list)
+        plt.figtext(0.5, 0.98, max_E_label, ha="center", va="top", fontsize=10, color="blue")
+        diff_max = f"{tc_list[np.argmax(np.diff(y_list))]:.3f}"
+        plt.figtext(0.5, 0.93, f'r: {r}'+' change: '+diff_max, ha="center", va="top", fontsize=10, color="blue")
+        plt.savefig(f'/content/current_Jr_maxE={max_E:.2f}_r={r}_{label}.png')
+        plt.show()
+        plt.close()
+        if i > 5:
+            break
+
+def current_kwant(sys, num_states = 20, max_E = 0.5):
+    H = sys.hamiltonian_submatrix(sparse=False)
+    J = kwant.operator.Current(sys)
+    sum_current = None
+    
+    if num_states is not None:
+        evals, evecs = eigsh(H, k=num_states, sigma=0)
+        max_E_label = 'max energy: '+ f'{max(evals, key=abs):.3f}'
+        for i in range(num_states):
+            current = J(evecs[:, i])
+            if sum_current is None:
+                sum_current = current
+            else:
+                sum_current += current
+    else:
+        evals, evecs = eigh(H)
+        max_E_label = 'max energy: '+ f'{max_E:.3f}'
+        for i, e in enumerate(evals):
+            if abs(e) < max_E:
+                current = J(evecs[:, i])
+                if sum_current is None:
+                    sum_current = current
+                else:
+                    sum_current += current
         
-    plt.figure()
-    kwant.plotter.current(sys, combined_current, colorbar=True, show = False)
+    fig, ax = plt.subplots()
+    kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
+    kwant.plotter.current(sys, sum_current, ax=ax, colorbar=True)
     label = pick_label(model['name'])
     plt.figtext(0.5, 0.98, label, ha="center", va="top", fontsize=10, color="blue")
     plt.figtext(0.5, 0.93, max_E_label, ha="center", va="top", fontsize=10, color="blue")
     plt.xlim(-3, 3)
     plt.ylim(-3, 3)
+    plt.savefig(f'/content/current_kwant_maxE={max_E:.2f}_{label}.png')
     plt.show()
     plt.close()
-      
+    
 # import pybinding as pb
 
 def rectangle_vertex(L, W):
     cc = model['cc']
     return (L*cc/2, ((W-1)/2*1.5+1)*cc/sqrt(3))
 
-def pick_label(name):
+def pick_label(name, iftc = True):
     if name == HALDANETRI:
         return name + '_' + model['category'] + '_' + f"t3={model['t3']:.2f}_tc={model['tc']:.2f}_t2={model['t2']:.2f}_L={model['L']}_W={model['W']}"
     if name == DEFECT:
+        if iftc == False:
+            return name + '_' + model['category'] + '_' + f"L={model['L']}_W={model['W']}"    
         return name + '_' + model['category'] + '_' + f"tc={model['tc']:.2f}_L={model['L']}_W={model['W']}"
     else:
         system.exit()
@@ -214,7 +295,7 @@ def haldane_triangular():
     cc = model['cc']
     lat = kwant.lattice.general([(cc, 0), (cc / 2, cc * sqrt(3) / 2)],
                                  [(0, 0), (cc/2, -cc / (2*sqrt(3))), (cc/2, cc / (2 * sqrt(3)))],
-                                 ['c', 'a', 'b'])
+                                 ['c', 'a', 'b'], norbs=1)
     c, a, b = lat.sublattices
 
     m, m2 = model['m'], model['m2']
@@ -528,8 +609,4 @@ def sync_png_files():
 #different_haldane()
 # sync_png_files()
 
-change_model(DEFECT, CLUSTER)
-for tc in [0.5, 1.2, 1.6, 1.7, 1.9, 2.0, 4.0]:
-  model['tc'] = tc
-  sys = model_builder()
-  defect_current(sys, num_states=None, max_E=0.5)
+current_Jr(DEFECT, SINGLE, max_E=0.2)
