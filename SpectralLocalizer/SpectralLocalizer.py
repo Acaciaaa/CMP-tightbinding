@@ -102,7 +102,8 @@ def defect_graphene():
         
     # kwant.plot(sys)
     return sys.finalized()
-    
+
+from scipy.stats import gaussian_kde
 def current_Jr(name, category, max_E = 0.5):
     max_E_label = 'max energy: '+ f'{max_E:.3f}'
     
@@ -124,10 +125,28 @@ def current_Jr(name, category, max_E = 0.5):
             pos_info.append([np.dot(unit_vector, thetahat), r])
         return distance, pos_info
     
-    def current_info(sys):
+    def find_distribution(evals):
+        plt.hist(evals, bins=50, range = (-2, 2), color='blue', alpha=0.7)
+        tick_marks = np.linspace(-2, 2, 51) 
+        plt.xticks(tick_marks, rotation=90, fontsize=7) 
+        plt.title('Energy Frequency Distribution: h=' + f"{model['tc']}")
+        plt.xlabel('Energy')
+        plt.ylabel('Frequency')
+        plt.savefig(f'/content/energy distribution/energy_distribution_{label}.png')
+        plt.grid(True)
+        plt.show()
+        plt.close()
+        
+        closest_to_zero = sorted(evals, key=abs)[:50]
+        print(closest_to_zero)
+    
+    def current_info(sys, find_energy_distribution = False):
         H = sys.hamiltonian_submatrix(sparse=False)
         J = kwant.operator.Current(sys)
         evals, evecs = eigh(H)
+        # to find energy upperbound for edge states
+        if find_energy_distribution == True:
+            find_distribution(evals)
         sum_current = None
         for i, e in enumerate(evals):
             if abs(e) < max_E:
@@ -139,46 +158,48 @@ def current_Jr(name, category, max_E = 0.5):
         return sum_current
     
     def magnitude_info():
-        temp = [None] * len(distance)
-        magnitude = np.zeros(len(distance))
+        temp = [None] * len(sort_r)
+        magnitude = np.zeros(len(sort_r))
         for index, current in enumerate(sum_current):
             result = current * pos_info[index][0]
             r = pos_info[index][1]
-            if temp[distance[r]] is None:
-                temp[distance[r]] = [result]
+            if temp[sort_distance[r]] is None:
+                temp[sort_distance[r]] = [result]
             else:
-                temp[distance[r]].append(result)
-        for key, value in distance.items():
-            magnitude[value] = np.sum(temp[value])
+                temp[sort_distance[r]].append(result)
+        # for r in sort_r:
+        #     print(r, temp[sort_distance[r]], len(temp[sort_distance[r]]))
+        for key, value in sort_distance.items():
+            magnitude[value] = np.sum(temp[value])/len(temp[value])
         return magnitude
     
     change_model(name, category)
     temp_sys = model_builder()
     distance, pos_info = edge_info(temp_sys)
     sort_r = sorted(distance.keys())
-    num_tc = 500
-    data = np.zeros((num_tc, len(distance)))
-    tc_list = np.linspace(0.8, 1.3, num_tc)
-    for index, tc in enumerate(tc_list):
+    sort_distance = {key: index for index, key in enumerate(sort_r)}
+    
+    tc_list = [0, 0.6,0.7, 0.8, 0.9, 0.94, 0.95, 0.96, 1.0, 1.1, 1.2, 1.5, 2.0, 5.0, 10]
+    for tc in tc_list:
         model['tc'] = tc
         sys = model_builder()
-        sum_current = current_info(sys)
+        label = pick_label(model['name'])
+        
+        sum_current = current_info(sys, find_energy_distribution = False)
         magnitude = magnitude_info()
-        data[index, :] = magnitude
-    # r最小为例子
-    label = pick_label(model['name'], iftc = False)
-    for i, r in enumerate(sort_r):
+        
         plt.figure()
-        y_list = data[:,distance[r]]
-        plt.plot(tc_list, y_list)
-        plt.figtext(0.5, 0.98, max_E_label, ha="center", va="top", fontsize=10, color="blue")
-        diff_max = f"{tc_list[np.argmax(np.diff(y_list))]:.3f}"
-        plt.figtext(0.5, 0.93, f'r: {r}'+' change: '+diff_max, ha="center", va="top", fontsize=10, color="blue")
-        plt.savefig(f'/content/current_Jr_maxE={max_E:.2f}_r={r}_{label}.png')
+        plt.scatter(sort_r, magnitude, s=1)
+        plt.plot(sort_r, magnitude, marker='o')
+        plt.axhline(0, color='grey', linewidth=1)
+        plt.ylim(-0.14, 0.08)
+        plt.xlabel('distance r')
+        plt.ylabel('average current')
+        plt.figtext(0.5, 0.93, max_E_label, ha="center", va="top", fontsize=10, color="blue")
+        plt.figtext(0.5, 0.97, label, ha="center", va="top", fontsize=10, color="blue")
+        plt.savefig(f'/content/current_Jr/current_Jr_maxE={max_E:.2f}_{label}.png')
         plt.show()
         plt.close()
-        if i > 5:
-            break
 
 def current_kwant(sys, num_states = 20, max_E = 0.5):
     H = sys.hamiltonian_submatrix(sparse=False)
@@ -543,9 +564,9 @@ def change_para(func):
         elif model['name'] == DEFECT: # x_fix = 0
             # y_min = -const*cc, y_max = const*cc
             para.update(dict(func = func,
-                             y_min = -3*cc, y_max = 3*cc, num_cc=200,
+                             y_min = -2*y, y_max = 0, num_cc=200,
                              x_min = 0, x_max = 0,
-                             num_eigvals = 6,))
+                             num_eigvals = 20,))
     else:
         print('change_para error')
         system.exit()
@@ -609,4 +630,10 @@ def sync_png_files():
 #different_haldane()
 # sync_png_files()
 
-current_Jr(DEFECT, SINGLE, max_E=0.2)
+current_Jr(DEFECT, SINGLE, max_E=0.1)
+# change_model(DEFECT, SINGLE)
+# for tc in [0.8, 1, 1.2, 1.5, 2, 3, 5, 10, 20]:
+#     model['tc'] = tc
+#     sys = model_builder()
+#     change_para(CHANGE)
+#     eigenvalues_change(sys)
