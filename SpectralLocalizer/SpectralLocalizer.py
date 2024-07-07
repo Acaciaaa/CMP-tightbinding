@@ -132,7 +132,7 @@ def current_Jr(name, category, max_E = 0.5):
         plt.title('Energy Frequency Distribution: h=' + f"{model['tc']}")
         plt.xlabel('Energy')
         plt.ylabel('Frequency')
-        plt.savefig(f'/content/energy distribution/energy_distribution_{label}.png')
+        plt.savefig(f'/content/energy_distribution_{label}.png')
         plt.grid(True)
         plt.show()
         plt.close()
@@ -197,7 +197,7 @@ def current_Jr(name, category, max_E = 0.5):
         plt.ylabel('average current')
         plt.figtext(0.5, 0.93, max_E_label, ha="center", va="top", fontsize=10, color="blue")
         plt.figtext(0.5, 0.97, label, ha="center", va="top", fontsize=10, color="blue")
-        plt.savefig(f'/content/current_Jr/current_Jr_maxE={max_E:.2f}_{label}.png')
+        plt.savefig(f'/content/current_Jr_maxE={max_E:.2f}_{label}.png')
         plt.show()
         plt.close()
 
@@ -462,7 +462,10 @@ def eigenvalues_change(sys):
     tracked_eigvals = np.zeros((num_coords, num_eigvals))
 
     for i, y in enumerate(v_coords):
-        L, dim = spectral_localizer(sys, y, coord_fix, 0)
+        if para['x_min'] == para['x_max']:
+            L, dim = spectral_localizer(sys, y = y, x = coord_fix, E = 0)
+        elif para['y_min'] == para['y_max']:
+            L, dim = spectral_localizer(sys, y = coord_fix, x = y, E = 0)
         current_eigvals = eigsh(L, k=num_eigvals, sigma=0, return_eigenvectors=False, tol=1e-5)
 
         b = np.sort(current_eigvals)[::-1]
@@ -506,6 +509,110 @@ def eigenvalues_change(sys):
 
     str_zero_point = 'zero point: ' + ', '.join([f'{item:.3f}' for item in zero_point])
     plt.figtext(0.5, 0.96, str_zero_point, ha="center", va="top", fontsize=10, color="blue")
+    plt.figtext(0.5, 0.92, xlabel, ha="center", va="top", fontsize=10, color="blue")
+    plt.savefig(f'/content/eigenvalues_change_{label}_{xlabel}.png')
+    plt.show()
+    plt.close()
+
+def signature_change3(sys):
+    import adaptive
+    def find_signature(point):
+        x, y = point
+        L, dim = spectral_localizer(sys, x, y, E = 0)
+        evals, evecs = eigh(L)
+        filtered_evals = evals[~np.isclose(evals, 0)]
+        pos = np.sum(filtered_evals > 0)
+        neg = np.sum(filtered_evals < 0)
+        return (pos - neg)/2
+
+    learner = adaptive.Learner2D(find_signature, bounds=[(-2.5, 2.5), (-2.5, 2.5)])
+    initial_points = [(0, 0), (-2.4, -2.4), (-1.5, -0.5), (-1.5, 0.5), (1.5, -0.5), (1.5, 0.5), (0, 1.5), (0, -1.5)]
+    for point in initial_points:
+        learner.tell(point, find_signature(point))
+
+    adaptive.runner.simple(learner, goal=lambda l: l.loss() < 0.05)
+
+    data = learner.data
+    X, Y, Z = zip(*[(x, y, z) for (x, y), z in data.items()])
+
+    # 绘制结果
+    fig, ax = plt.subplots()
+    plt.tricontourf(X, Y, Z, 100, cmap='RdYlGn', vmin=-1.01, vmax=1.01)  # 使用三角网格绘制等高线填充
+    kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
+    plt.colorbar()
+    plt.xlim(-2.5, 2.5)
+    plt.ylim(-2.5, 2.5)
+    
+    label = pick_label(model['name'])
+    plt.title(label)
+    plt.savefig(f'/content/adaptive/signature_adaptive_{label}.png')
+    plt.show()
+    plt.close()
+
+from matplotlib.colors import ListedColormap, Normalize
+import time
+def signature_change2(sys):
+    def find_signature(x, y):
+        L, dim = spectral_localizer(sys, x, y, E = 0)
+        evals, evecs = eigh(L)
+        filtered_evals = evals[~np.isclose(evals, 0)]
+        pos = np.sum(filtered_evals > 0)
+        neg = np.sum(filtered_evals < 0)
+        return (pos - neg)/2
+
+    x = np.linspace(-2.5, 0, 40)
+    y = np.linspace(-2.5, 0, 40)
+    X, Y = np.meshgrid(x, y)
+    Z = np.vectorize(find_signature)(X, Y)
+
+    cmap = ListedColormap(['lightgreen', 'white', 'pink'])
+    norm = Normalize(vmin=-1.5, vmax=1.5)
+
+    fig, ax = plt.subplots()
+    plt.imshow(Z, extent=[x.min(), x.max(), y.min(), y.max()], origin='lower', cmap=cmap, norm=norm)
+    plt.xlim(-2.5, 0)
+    plt.ylim(-2.5, 0)
+    kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
+    plt.colorbar()
+    
+    label = pick_label(model['name'])
+    plt.title(label)
+    plt.savefig(f'/content/grid/signature_grid_{label}.png')
+    plt.show()
+
+def signature_change(sys):
+    cc=model['cc']
+    num_cc = para['num_cc']
+    if para['x_min'] == para['x_max']: # zigzag
+        xlabel = f"x fixed at {para['x_min']:.2f}"
+        coord_fix = para['x_min']
+        v_min, v_max = para['y_min'], para['y_max']
+    elif para['y_min'] == para['y_max']: # armchair
+        xlabel = f"y fixed at {para['y_min']:.2f}"
+        coord_fix = para['y_min']
+        v_min, v_max = para['x_min'], para['x_max']
+    num_coords = int((v_max-v_min) *num_cc / cc)
+    v_coords = np.linspace(v_min, v_max, num=num_coords)
+    signature_list = []
+
+    for i, y in enumerate(v_coords):
+        if para['x_min'] == para['x_max']:
+            L, dim = spectral_localizer(sys, y = y, x = coord_fix, E = 0)
+        elif para['y_min'] == para['y_max']:
+            L, dim = spectral_localizer(sys, y = coord_fix, x = y, E = 0)
+        evals, evecs = eigh(L)
+        filtered_evals = evals[~np.isclose(evals, 0)]
+        pos = np.sum(filtered_evals > 0)
+        neg = np.sum(filtered_evals < 0)
+        signature_list.append((pos - neg)/2)
+        
+    plt.plot(v_coords, signature_list)
+    #plt.ylabel('localizer eigenvalues')
+    label = pick_label(model['name'])
+    plt.figtext(0.5, 0.01, label, ha="center", va="bottom", fontsize=10, color="blue")
+
+    #str_zero_point = 'zero point: ' + ', '.join([f'{item:.3f}' for item in zero_point])
+    #plt.figtext(0.5, 0.96, str_zero_point, ha="center", va="top", fontsize=10, color="blue")
     plt.figtext(0.5, 0.92, xlabel, ha="center", va="top", fontsize=10, color="blue")
     plt.savefig(f'/content/eigenvalues_change_{label}_{xlabel}.png')
     plt.show()
@@ -564,7 +671,7 @@ def change_para(func):
         elif model['name'] == DEFECT: # x_fix = 0
             # y_min = -const*cc, y_max = const*cc
             para.update(dict(func = func,
-                             y_min = -2*y, y_max = 0, num_cc=200,
+                             y_min = -3*cc, y_max = 3*cc, num_cc=200,
                              x_min = 0, x_max = 0,
                              num_eigvals = 20,))
     else:
@@ -630,10 +737,10 @@ def sync_png_files():
 #different_haldane()
 # sync_png_files()
 
-current_Jr(DEFECT, SINGLE, max_E=0.1)
-# change_model(DEFECT, SINGLE)
-# for tc in [0.8, 1, 1.2, 1.5, 2, 3, 5, 10, 20]:
-#     model['tc'] = tc
-#     sys = model_builder()
-#     change_para(CHANGE)
-#     eigenvalues_change(sys)
+# current_Jr(DEFECT, SINGLE, max_E=0.1)
+change_model(DEFECT, SINGLE)
+for tc in [0.6, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 3]:#, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 2, 3, 5, 10]:
+    model['tc'] = tc
+    sys = model_builder()
+    change_para(CHANGE)
+    signature_change3(sys)
