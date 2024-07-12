@@ -104,6 +104,7 @@ def defect_graphene():
     return sys.finalized()
 
 from scipy.stats import gaussian_kde
+import matplotlib.patches as patches
 def current_Jr(name, category, max_E = 0.5):
     max_E_label = 'max energy: '+ f'{max_E:.3f}'
     
@@ -157,6 +158,44 @@ def current_Jr(name, category, max_E = 0.5):
                     sum_current += current
         return sum_current
     
+    def draw_current():
+        print(model['tc'])
+        fig, ax = plt.subplots()
+        index = -1
+        for head, tail in sys.graph:
+            index += 1
+            if abs(sum_current[index]) < 1e-5:
+                continue
+            p1, p2 = sys.sites[head].pos, sys.sites[tail].pos
+            x_start, y_start, x_end, y_end = round(p1[0], 3), round(p1[1], 3), round(p2[0], 3), round(p2[1], 3)
+            if abs(x_start) > 3 or abs(x_end) > 3 or abs(y_start) > 3 or abs(y_end) > 3:
+                continue
+            weight = sum_current[index]
+            if weight < 0:
+                x_start, x_end = x_end, x_start
+                y_start, y_end = y_end, y_start
+                weight = -weight
+
+            mid_x = (x_start + x_end) / 2
+            mid_y = (y_start + y_end) / 2
+            r = sqrt(mid_x*mid_x+mid_y*mid_y)
+            if r < 0.3:
+                continue
+
+            arrow = patches.FancyArrowPatch((x_start, y_start), (mid_x, mid_y),
+                                            arrowstyle='-|>', connectionstyle='arc3,rad=0.0', mutation_scale=10, color='blue')
+            ax.add_patch(arrow)
+            if 0<=mid_x<=3 and 0<=mid_y<=3:
+                ax.text(mid_x, mid_y, f'{weight:.4f}'.lstrip('0').replace('-0.', '-.'), color='red', fontsize=8, ha='center', va='center')
+
+        ax.set_aspect('equal')
+        kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
+        plt.xlim(0, 3)
+        plt.ylim(0, 3)
+        plt.title(f"tc={tc}")
+        plt.show()
+        plt.close()
+    
     def magnitude_info():
         temp = [None] * len(sort_r)
         magnitude = np.zeros(len(sort_r))
@@ -167,8 +206,22 @@ def current_Jr(name, category, max_E = 0.5):
                 temp[sort_distance[r]] = [result]
             else:
                 temp[sort_distance[r]].append(result)
+        
+        # not for drawing J(r)
+        # before = [None] * len(sort_r)
+        # for index, current in enumerate(sum_current):
+        #     r = pos_info[index][1]
+        #     if before[sort_distance[r]] is None:
+        #         before[sort_distance[r]] = [current]
+        #     else:
+        #         before[sort_distance[r]].append(current)
+                
+        # print(model['tc'])        
         # for r in sort_r:
-        #     print(r, temp[sort_distance[r]], len(temp[sort_distance[r]]))
+        #     if sort_distance[r] < 5:
+        #         print(r, sort_distance[r])
+        #         print('before: ', before[sort_distance[r]])
+                
         for key, value in sort_distance.items():
             magnitude[value] = np.sum(temp[value])/len(temp[value])
         return magnitude
@@ -179,27 +232,28 @@ def current_Jr(name, category, max_E = 0.5):
     sort_r = sorted(distance.keys())
     sort_distance = {key: index for index, key in enumerate(sort_r)}
     
-    tc_list = [0, 0.6,0.7, 0.8, 0.9, 0.94, 0.95, 0.96, 1.0, 1.1, 1.2, 1.5, 2.0, 5.0, 10]
+    tc_list = [0.95, 0.97, 1.2]
     for tc in tc_list:
         model['tc'] = tc
         sys = model_builder()
         label = pick_label(model['name'])
         
         sum_current = current_info(sys, find_energy_distribution = False)
+        draw_current()
         magnitude = magnitude_info()
         
-        plt.figure()
-        plt.scatter(sort_r, magnitude, s=1)
-        plt.plot(sort_r, magnitude, marker='o')
-        plt.axhline(0, color='grey', linewidth=1)
-        plt.ylim(-0.14, 0.08)
-        plt.xlabel('distance r')
-        plt.ylabel('average current')
-        plt.figtext(0.5, 0.93, max_E_label, ha="center", va="top", fontsize=10, color="blue")
-        plt.figtext(0.5, 0.97, label, ha="center", va="top", fontsize=10, color="blue")
-        plt.savefig(f'/content/current_Jr_maxE={max_E:.2f}_{label}.png')
-        plt.show()
-        plt.close()
+        # plt.figure()
+        # plt.scatter(sort_r, magnitude, s=1)
+        # plt.plot(sort_r, magnitude, marker='o')
+        # plt.axhline(0, color='grey', linewidth=1)
+        # plt.ylim(-0.14, 0.08)
+        # plt.xlabel('distance r')
+        # plt.ylabel('average current')
+        # plt.figtext(0.5, 0.93, max_E_label, ha="center", va="top", fontsize=10, color="blue")
+        # plt.figtext(0.5, 0.97, label, ha="center", va="top", fontsize=10, color="blue")
+        # plt.savefig(f'/content/current_Jr_maxE={max_E:.2f}_{label}.png')
+        # plt.show()
+        # plt.close()
 
 def current_kwant(sys, num_states = 20, max_E = 0.5):
     H = sys.hamiltonian_submatrix(sparse=False)
@@ -238,6 +292,51 @@ def current_kwant(sys, num_states = 20, max_E = 0.5):
     plt.show()
     plt.close()
     
+def current_direction(name, category, max_E = 0.1):
+    change_model(name, category)
+    temp_sys = model_builder()
+    pos_info = []
+    for head, tail in temp_sys.graph:
+        p1, p2 = temp_sys.sites[head].pos, temp_sys.sites[tail].pos
+        # unit_vector = (p2-p1)/np.linalg.norm(p2-p1)
+        pos_info.append([p1, p2])
+    
+    last_current = None
+    num_edges = []
+    tc_list = [0.6, 0.96, 1.2, 3]
+    fig, ax = plt.subplots()
+    ax.set_aspect('equal')
+    for tc_index, tc in enumerate(tc_list):
+        model['tc'] = tc
+        sys = model_builder()
+        H = sys.hamiltonian_submatrix(sparse=False)
+        J = kwant.operator.Current(sys)
+        evals, evecs = eigh(H)
+        sum_current = None
+        for i, e in enumerate(evals):
+            if abs(e) < max_E:
+                current = J(evecs[:, i])
+                if sum_current is None:
+                    sum_current = current
+                else:
+                    sum_current += current
+        mask = np.isclose(sum_current, 0)
+        sum_current[mask] = 0
+        if last_current is not None:
+            signs_differ = np.sign(sum_current) != np.sign(last_current)
+            index = np.where(signs_differ)[0]
+            for i in index:
+                # print(pos_info[i][0], pos_info[i][1])
+                color_map = {1:'purple',2:'orange',3:'red'}
+                ax.plot([pos_info[i][0][0], pos_info[i][1][0]], [pos_info[i][0][1], pos_info[i][1][1]], color=color_map[tc_index])
+        last_current = sum_current[:]
+    
+    kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
+    # plt.title(f"{tc_list[tc_index-1]}-{tc}")
+    plt.show()
+    plt.close()
+    
+        
 # import pybinding as pb
 
 def rectangle_vertex(L, W):
@@ -580,41 +679,34 @@ def signature_change2(sys):
     plt.savefig(f'/content/grid/signature_grid_{label}.png')
     plt.show()
 
-def signature_change(sys):
-    cc=model['cc']
-    num_cc = para['num_cc']
-    if para['x_min'] == para['x_max']: # zigzag
-        xlabel = f"x fixed at {para['x_min']:.2f}"
-        coord_fix = para['x_min']
-        v_min, v_max = para['y_min'], para['y_max']
-    elif para['y_min'] == para['y_max']: # armchair
-        xlabel = f"y fixed at {para['y_min']:.2f}"
-        coord_fix = para['y_min']
-        v_min, v_max = para['x_min'], para['x_max']
-    num_coords = int((v_max-v_min) *num_cc / cc)
-    v_coords = np.linspace(v_min, v_max, num=num_coords)
-    signature_list = []
-
-    for i, y in enumerate(v_coords):
-        if para['x_min'] == para['x_max']:
-            L, dim = spectral_localizer(sys, y = y, x = coord_fix, E = 0)
-        elif para['y_min'] == para['y_max']:
-            L, dim = spectral_localizer(sys, y = coord_fix, x = y, E = 0)
+def signature_change():
+    change_model(DEFECT, SINGLE)
+    signature_value = []
+    tc_value = np.linspace(0.8, 1.3, 1000)
+    for tc in tc_value:
+        model['tc'] = tc
+        sys = model_builder()
+        L, dim = spectral_localizer(sys, 0, 0, 0)
         evals, evecs = eigh(L)
         filtered_evals = evals[~np.isclose(evals, 0)]
         pos = np.sum(filtered_evals > 0)
         neg = np.sum(filtered_evals < 0)
-        signature_list.append((pos - neg)/2)
+        signature_value.append((pos - neg)/2)
         
-    plt.plot(v_coords, signature_list)
-    #plt.ylabel('localizer eigenvalues')
-    label = pick_label(model['name'])
+    plt.plot(tc_value, signature_value)
+    plt.axhline(0, color='red', linewidth=1.5, linestyle='--')
+    plt.ylabel('local chern number(origin) change')
+    label = pick_label(model['name'], iftc=False)
     plt.figtext(0.5, 0.01, label, ha="center", va="bottom", fontsize=10, color="blue")
+    
+    changes = np.where(np.diff(signature_value) != 0)[0]
+    print(tc_value[changes[0]], tc_value[changes[0]+1], tc_value[changes[1]], tc_value[changes[1]+1])
+    zero_1 = (tc_value[changes[0]]+tc_value[changes[0]+1])/2
+    zero_2 = (tc_value[changes[1]]+tc_value[changes[1]+1])/2
 
-    #str_zero_point = 'zero point: ' + ', '.join([f'{item:.3f}' for item in zero_point])
-    #plt.figtext(0.5, 0.96, str_zero_point, ha="center", va="top", fontsize=10, color="blue")
-    plt.figtext(0.5, 0.92, xlabel, ha="center", va="top", fontsize=10, color="blue")
-    plt.savefig(f'/content/eigenvalues_change_{label}_{xlabel}.png')
+    str_zero_point = f'zero crossing:{zero_1:.3f}, {zero_2:.3f}'
+    plt.figtext(0.5, 0.8, str_zero_point, ha="center", va="top", fontsize=10, color="blue")
+    plt.savefig(f'/content/signature_change_origin_{label}.png')
     plt.show()
     plt.close()
 
@@ -737,10 +829,11 @@ def sync_png_files():
 #different_haldane()
 # sync_png_files()
 
-# current_Jr(DEFECT, SINGLE, max_E=0.1)
-change_model(DEFECT, SINGLE)
-for tc in [0.6, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 3]:#, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 2, 3, 5, 10]:
-    model['tc'] = tc
-    sys = model_builder()
-    change_para(CHANGE)
-    signature_change3(sys)
+# signature_change()
+current_Jr(DEFECT, SINGLE, max_E=0.1)
+# change_model(DEFECT, SINGLE)
+# for tc in [0.94, 0.95, 0.96, 0.97, 1.19, 1.21]:
+#     model['tc'] = tc
+#     sys = model_builder()
+#     change_para(CHANGE)
+#     signature_change2(sys)
