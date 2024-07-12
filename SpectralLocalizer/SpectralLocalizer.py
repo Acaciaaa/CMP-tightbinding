@@ -24,7 +24,7 @@ class SimpleNamespace(object):
         self.__dict__.update(kwargs)
 
 CONTINUEPOINT = 0.1
-# test macbook
+
 HALDANETRI, DEFECT, PYBINDING = 'haldane and triangular', 'defect graphene', 'pybinding'
 NONTRIVIAL, TRIVIAL, SINGLE, CLUSTER, NONE = 'nontrivial', 'trivial', 'single', '7 hexagons', 'none'
 model = dict(name = NONE,  category = NONE,
