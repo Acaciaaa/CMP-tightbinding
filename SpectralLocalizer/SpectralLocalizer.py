@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
 import sys as system
 import cmath
-from math import sqrt, pi, sin, cos
+from math import sqrt, pi, sin, cos, dist
 import warnings
 
 '''Defining Pauli matrices'''
@@ -101,7 +101,7 @@ def defect_graphene():
                     sys[a(tar[0], tar[1]), a(sour[0], sour[1])] = temp
     else:
         system.exit()
-        
+    
     #kwant.plot(sys)
     return sys.finalized()
 
@@ -184,23 +184,27 @@ def current_Jr(name, category):
         sum_current = None
         
         if tag == CUTOFF:
-            max_E = args[0]
-            way = f"cutoff_max_E={max_E:.2f}"
+            start, stop = args[0], args[1]
+            way = f"cutoff_start={start:.2f}_stop={stop:.2f}"
             for i, e in enumerate(evals):
-                if e > 0 and e <= max_E:
+                if e > start and e <= stop:
                     if sum_current is None:
                         sum_current = current[i]
                     else:
                         sum_current += current[i]
             
         elif tag == GAUSSIAN:
-            max_E, E0, sigma = args[0], args[1], args[2]
-            way = f"gaussian_maxE={max_E:.2f}_E0={E0:.2f}_sigma={sigma:.2f}"
-            gaussian_values = np.exp(-(evals - E0)**2 / (2 * sigma**2))
+            start, stop, min, max, sigma = args[0], args[1], args[2], args[3], args[4]
+            way = f"gaussian_start={start:.2f}_stop={stop:.2f}_sigma={sigma:.2f}"
+            gaussian_values = np.exp(-(evals - stop)**2 / (2 * sigma**2)) + np.exp(-(evals - start)**2 / (2 * sigma**2))
             gaussian_values /= np.max(gaussian_values)
-            gaussian_values[evals <= E0] = 1
-            gaussian_values[evals >= max_E] = 0
-            gaussian_values[evals < 0] = 0
+            gaussian_values[(evals >= start) & (evals <= stop)] = 1
+            if min is not None:
+                way += f"_min={min:.2f}"
+                gaussian_values[evals <= min] = 0
+            if max is not None:
+                way += f"_max={max:.2f}"
+                gaussian_values[evals >= max] = 0
 
             for i, e in enumerate(gaussian_values):
                 if e > 0:
@@ -268,8 +272,8 @@ def current_Jr(name, category):
                 plt.savefig(f"\content\Chern_Current_h={h:.2f}.png")
                 plt.show()
                 plt.close()
-
-    def magnitude_info(sum_current):
+    
+    def magnitude_info(sum_current, buckets=np.array([])):
         temp = [None] * len(sort_r)
         magnitude = np.zeros(len(sort_r))
         sum_direct, sum_angular = 0, 0
@@ -295,17 +299,16 @@ def current_Jr(name, category):
         #     if sort_distance[r] < 5:
         #         print(r, sort_distance[r])
         #         print('before: ', before[sort_distance[r]])
-                
+        sum_buckets = np.zeros(len(buckets) + 1)
         for key, value in sort_distance.items():
-            # if value == 3:
-            #     print(value, ': ',temp[value])
             tmp = np.sum(temp[value])
-            if value >= 0:
-                sum_direct += tmp
-                sum_angular += tmp*key
+            sum_direct += tmp
+            sum_angular += tmp*key
+            index = np.digitize(key, buckets)
+            sum_buckets[index] += tmp
             magnitude[value] = tmp/len(temp[value])
-            # print(len(temp[value]), key)
-        return magnitude, sum_direct, sum_angular
+            
+        return magnitude, sum_direct, sum_angular, sum_buckets
     
     change_model(name, category)
     def pos():
@@ -315,6 +318,8 @@ def current_Jr(name, category):
         sort_distance = {key: index for index, key in enumerate(sort_r)}
         return pos_info, sort_r, sort_distance
     pos_info, sort_r, sort_distance = pos()
+    #r是实际距离 sort_r里是从小到大的r sort_distance里是从小到大的r和对应的编号
+    
     # draw_distribution()
     # draw_current()
     
@@ -328,7 +333,7 @@ def current_Jr(name, category):
             evals, current = pure_current_info(sys)
             way, sum_current = current_filter(evals, current, tag, *args)
             # draw_current()
-            magnitude, _, _ = magnitude_info(sum_current)
+            magnitude, _, _, _ = magnitude_info(sum_current, np.array([]))
             multiply_item = magnitude# * sort_r
             
             plt.figure()
@@ -371,19 +376,16 @@ def current_Jr(name, category):
 
     # always change due to diff requirements
     def draw_sum(whichsum, tag, *args):
-        h_num = 50
-        part1 = np.linspace(0.3, 0.9, 60)
-        part2 = np.linspace(0.9, 1.1, 100)
-        part3 = np.linspace(1.1, 1.5, 40)
-        h_list = np.concatenate((part1, part2, part3))
-        #h_list = np.concatenate((np.linspace(0.3, 1.3, 100), np.linspace(1.3, 9.3, 16))) large h
-        h_list = np.linspace(0.3, 2, h_num)
+        h_num = 150
+        h_list = np.concatenate((np.linspace(0.3, 1.8, h_num), np.linspace(1.8, 9.8, 16)))
+        h_list = np.linspace(0.3, 1.8, h_num)
         
         def diff_size():
             nonlocal pos_info, sort_r, sort_distance
             plt.figure()
-            for L in [9, 13, 17]:
+            for L in [5, 9, 13, 17]:
                 model['L'] = L
+                model['W'] = L
                 pos_info, sort_r, sort_distance = pos()
                 sum_list = []
                 for i, h in enumerate(h_list):
@@ -409,37 +411,71 @@ def current_Jr(name, category):
             plt.show()
             plt.close()
         
-        def diff_state():
-            state_num = 6
-            sum_list = np.zeros((state_num, h_num))
+        def diff_nonsize():
+            buckets = np.array([0.6, 1.6, 3, 5])
+            buckets_num = len(buckets)+1
+            if tag == STATE:
+                line_num = 5
+            elif tag == GAUSSIAN:
+                line_num = 1
+            sum_list = np.zeros((line_num, h_num, buckets_num))
             for i, h in enumerate(h_list):
                 model['h'] = h
                 sys = model_builder()
                 evals, current = pure_current_info(sys)
-                for n in range(state_num):
-                    way, sum_current = current_filter(evals, current, tag, n, n+1)
+                for n in range(line_num):
+                    if tag == STATE:
+                        way, sum_current = current_filter(evals, current, tag, n, n+1)
+                    elif tag == GAUSSIAN:
+                        way, sum_current = current_filter(evals, current, tag, 0, 0.2, None, None, 0.01)
                     if whichsum == 'J(r)':
-                        _, sum, _ = magnitude_info(sum_current)
+                        _, sum, _, sum_buckets = magnitude_info(sum_current, buckets)
                     elif whichsum == 'J(r)_r':    
-                        _, _, sum = magnitude_info(sum_current)
-                    sum_list[n, i] = sum
-            plt.figure()
-            for n in range(state_num):
-                plt.scatter(h_list, n, label=f"{n}")
-            plt.axhline(0, color='grey', linewidth=1)
-            plt.xlabel('h')
-            plt.legend()
-            plt.ylabel('sum of '+whichsum)
-            # plt.figtext(0.5, 0.92, f"cross:[{zero_points[0]:.3f}, {zero_points[1]:.3f}]", ha="center", va="top", fontsize=10, color="blue")
-            plt.figtext(0.5, 0.97, way, ha="center", va="top", fontsize=10, color="blue")
-            # plt.savefig(f'/content/sum_{whichsum}_{way}_{label}.png')
-            plt.show()
-            plt.close()
+                        _, _, sum, sum_buckets = magnitude_info(sum_current, buckets)
+                    sum_list[n, i, :] = sum_buckets
+                    #sum_list[n, i] = sum
+            def single_sum():
+                plt.figure()
+                for n in range(line_num):
+                    plt.scatter(h_list, sum_list[n], label=f"{n}", s=1)
+                plt.axhline(0, color='grey', linewidth=1)
+                #plt.ylim(-0.05, 0.1)
+                plt.xlabel('h')
+                plt.legend()
+                plt.ylabel('sum of '+whichsum)
+                # plt.figtext(0.5, 0.92, f"cross:[{zero_points[0]:.3f}, {zero_points[1]:.3f}]", ha="center", va="top", fontsize=10, color="blue")
+                plt.figtext(0.5, 0.97, way, ha="center", va="top", fontsize=10, color="blue")
+                # plt.savefig(f'/content/sum_{whichsum}_{way}_{label}.png')
+                plt.show()
+                plt.close()
+            def multiple_sum_r():
+                for r in range(buckets_num):
+                    left, right = 'origin', 'outside'
+                    if r != 0:
+                        left = buckets[r-1]
+                    if r != len(buckets):
+                        right = buckets[r]
+                    plt.figure()
+                    for n in range(line_num):
+                        plt.scatter(h_list, sum_list[n, :, r], label=f"{n}", s=2)
+                    plt.axhline(0, color='grey', linewidth=1)
+                    plt.ylim(-0.5, 0.65)
+                    plt.xlabel('h')
+                    plt.legend()
+                    plt.ylabel('sum of '+whichsum)
+                    # plt.figtext(0.5, 0.92, f"cross:[{zero_points[0]:.3f}, {zero_points[1]:.3f}]", ha="center", va="top", fontsize=10, color="blue")
+                    plt.figtext(0.5, 0.97, f"[{left}, {right})", ha="center", va="top", fontsize=10, color="blue")
+                    # plt.savefig(f'/content/sum_{whichsum}_{way}_{label}.png')
+                    plt.show()
+                    plt.close()
+            #single_sum()
+            multiple_sum_r()
 
-        diff_state()
-    draw_sum('J(r)', STATE)# -> diff_state
-    # draw_sum('J(r)', GAUSSIAN, 0.2, 0, 0.05) -> diff_size
-    # draw_sum('J(r)', GAUSSIAN, 0.2, 0, 0.1) -> diff_size
+        diff_nonsize()
+
+    draw_sum('J(r)', STATE)
+    #draw_sum('J(r)', GAUSSIAN)
+    #draw_sum('J(r)', GAUSSIAN, 0, 0, 0, 0.2, 0.05)# -> diff_size
     
     # diff L and sigma
     def zero_points_Gaussian():
@@ -452,9 +488,9 @@ def current_Jr(name, category):
         h_list = np.linspace(0.9, 1.2, 300)
         def magnitude_filter():
             if whichsum == 'J(r)':
-                _, sum, _ = magnitude_info(sum_current)
+                _, sum, _, _ = magnitude_info(sum_current)
             elif whichsum == 'J(r)_r':    
-                _, _, sum = magnitude_info(sum_current)
+                _, _, sum, _ = magnitude_info(sum_current)
             return sum
         
         for L in [9, 10, 11, 12, 13, 14, 15, 16, 17]:
@@ -654,12 +690,14 @@ def rectangle_vertex(L, W):
     cc = model['cc']
     return (L*cc/2, ((W-1)/2*1.5+1)*cc/sqrt(3))
 
-def pick_label(name, ifh = True):
+def pick_label(name, ifh = True, ifkappa = True):
     if name == HALDANETRI:
         return name + '_' + model['category'] + '_' + f"t3={model['t3']:.2f}_h={model['h']:.2f}_t2={model['t2']:.2f}_L={model['L']}_W={model['W']}"
     if name == DEFECT or name == HALDANE:
         if ifh == False:
             return name + '_' + model['category'] + f"_kappa={model['kappa']}_L={model['L']}_W={model['W']}"    
+        if ifkappa == False:
+            return name + '_' + model['category'] + f"_h={model['h']:.2f}_L={model['L']}_W={model['W']}"    
         return name + '_' + model['category'] + f"_h={model['h']:.2f}_kappa={model['kappa']}_L={model['L']}_W={model['W']}"
     else:
         system.exit()
@@ -904,20 +942,41 @@ def sigma_change():# precondition: eigenvalues_change already cross 0
     plt.show()
     plt.close()
 
-def spectral_localizer1(sys, x, y, e):
+def spectral_localizer_edit(sys, x, y, e, *args):
     kappa = model['kappa']
 
-    H = sys.hamiltonian_submatrix()
+    H = sys.hamiltonian_submatrix(sparse=False)
     dim = np.shape(H)[0]
     X, Y = np.zeros(H.shape), np.zeros(H.shape)
     for i, site in enumerate(sys.sites):
         X[i, i] = site.pos[0]
         Y[i, i] = site.pos[1]
+    
+    P = X-x*np.identity(dim) - 1j * (Y-y*np.identity(dim))
+    P_diag = np.diag(P)
+    if args[0] == 'abs':
+        P_diag_edit = [z * (np.abs(z)**(args[1])) for z in P_diag]
+    elif args[0] == 'angle':
+        def adjust_angle(z):
+            r = np.abs(z)
+            theta = np.angle(z)
+            new_theta = theta / 2
+            # if np.real(z) >= 0:
+            #     new_theta = theta * (3/4)
+            # else:
+            #     new_theta = theta - (np.pi + theta) / 4
+            return r * np.exp(1j * new_theta)
 
-    L = kron(sz, Y-y*np.identity(dim)) + kappa * (kron(sx, X-x*np.identity(dim)) + kron(sy, H-e*np.identity(dim)))
+        P_diag_edit = np.array([adjust_angle(z) for z in P_diag])
+    
+    P_edit = np.diag(P_diag_edit)
+    L = np.block([
+    [H-e*np.identity(dim), kappa*P_edit],
+    [kappa*np.conj(P_edit), -H+e*np.identity(dim)]
+])
     return L, dim
   
-def eigenvalues_change(sys, e):
+def eigenvalues_change(sys, e, *args):
     cc=model['cc']
     num_cc, num_eigvals = para['num_cc'], para['num_eigvals']
     if para['x_min'] == para['x_max']: # zigzag
@@ -934,7 +993,7 @@ def eigenvalues_change(sys, e):
 
     for i, y in enumerate(v_coords):
         if para['x_min'] == para['x_max']:
-            L, dim = spectral_localizer(sys, y = y, x = coord_fix, e = e)
+            L, _ = spectral_localizer_edit(sys, coord_fix, y, e, *args) #!!!!!!!!!!!!!!!
         elif para['y_min'] == para['y_max']:
             L, dim = spectral_localizer(sys, y = coord_fix, x = y, e = e)
         current_eigvals = eigsh(L, k=num_eigvals, sigma=0, return_eigenvectors=False, tol=1e-5)
@@ -963,8 +1022,8 @@ def eigenvalues_change(sys, e):
     plt.axhline(0, color='grey', linewidth=1)
     for i in range(num_eigvals):
         line = tracked_eigvals[:, i]
-        if np.max(np.abs(np.diff(line))) > CONTINUEPOINT:
-            continue
+        # if np.max(np.abs(np.diff(line))) > CONTINUEPOINT:
+        #     continue
 
         signs = np.sign(line)
         changes = np.diff(signs)
@@ -1142,7 +1201,7 @@ def change_para(func):
     elif func==CHANGE:
         if model['name'] == HALDANETRI or model['name'] == HALDANE: # x_fix = 0 or cc/2
             para.update(dict(func = func,
-                             y_min = -y, y_max = 0, num_cc=200,
+                             y_min = -y, y_max = -y/2, num_cc=200,
                              x_min = 0, x_max = 0,
                              num_eigvals = 20,))
         elif model['name'] == DEFECT: # x_fix = 0
@@ -1154,6 +1213,7 @@ def change_para(func):
     else:
         print('change_para error')
         system.exit()
+    return x, y
 
 def band_structure():
     change_model(HALDANETRI, NONTRIVIAL)
@@ -1207,31 +1267,51 @@ def sync_png_files():
 
 #current_Jr(DEFECT, SINGLE, max_E=0.175)
 
-def draw_H_psi():
-    change_model(DEFECT, SINGLE)
-    for i in range(10):
-        for h in [0.0]:
-            model['h'] = h
-            sys = model_builder()
-            H = sys.hamiltonian_submatrix(sparse=False)
-            evals, evecs = eigh(H)
-            def custom_sort(evals, evecs):
-                indices = np.argsort(np.abs(evals))
-                sorted_evals = evals[indices]
-                sorted_eigens = evecs[:, indices]
-                return sorted_evals, sorted_eigens
-            sorted_evals, sorted_evecs = custom_sort(evals, evecs)
+def draw_H_psi(sys, state, x_range):
+    J = kwant.operator.Current(sys)
+    H, X, Y, dim = HXY(sys)
+    evals, evecs = eigh(H)
+    def custom_sort(evals, evecs):
+        indices = np.argsort(np.abs(evals))
+        sorted_evals = evals[indices]
+        sorted_eigens = evecs[:, indices]
+        return sorted_evals, sorted_eigens
+    sorted_evals, sorted_evecs = custom_sort(evals, evecs)
+    def draw_sth():
+        evec = sorted_evecs[:, state*2]
+        # current = J(evec)
+        # fig, ax = plt.subplots()
+        # kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
+        # kwant.plotter.current(sys, current, ax=ax, colorbar=True)
+        # plt.show()
+        data = np.abs(evec)**2
+        vmax = np.max(data)
+        print(vmax)
+        fig, ax = plt.subplots()
+        kwant.plotter.map(sys, data, vmax=vmax, ax=ax)
+        kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
+        plt.show()
+    def calculate_expectation():
+        psi = sorted_evecs[:, state*2]
+        P = np.zeros(H.shape)
+        for i, site in enumerate(sys.sites):
+            if site.pos[1] > 0:
+                P[i, i] = 0
+            else:
+                P[i, i] = 1
+        Px = np.zeros(H.shape)
+        for i, site in enumerate(sys.sites):
+            if site.pos[0]>=x_range[0] and site.pos[0]<=x_range[1]:
+                Px[i, i] = 1
+            else:
+                Px[i, i] = 0
+        psi_project = Px@P@psi
+        psi_normalized = psi_project / np.sqrt(np.conj(psi_project).T @ psi_project)
+        expectation = np.conj(psi_normalized).T @ Y @ psi_normalized
+        return sorted_evals[state*2], expectation
+    #draw_sth()
+    return calculate_expectation()
             
-            data = np.abs(sorted_evecs[:, i*2])**2
-            vmax = np.max(data)
-            fig, ax = plt.subplots()
-            kwant.plotter.map(sys, data, vmax=vmax, ax=ax)
-            kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
-            label = pick_label(model['name'])
-            plt.title(f"h={h} |e|={abs(sorted_evals[i*2])} order={i}")
-            plt.savefig(f"/content/LDOS_{label}_{i}.png")
-            plt.show()
-
 def draw_L_psi(sys, x=0, y=0, e=0):
     def draw_tool(v, title):
         data = np.abs(v)**2
@@ -1259,7 +1339,7 @@ def draw_L_psi(sys, x=0, y=0, e=0):
     np.random.seed(0)
     eval, evec = eigsh(L, k=1, which='SM', return_eigenvectors=True)#, tol=1e-10)
     psi1, psi2 = evec[:dim, 0], evec[dim:, 0]
-    psi11, psi12, psi21, psi22 = subvec(evec)
+    #psi11, psi12, psi21, psi22 = subvec(evec)
     print('eval: ', eval)
     print('lattice number: ', dim)
     print('<1|2>: ', np.vdot(psi1, psi2))# +np.vdot(evec[n:, 0], evec[:n, 0]))
@@ -1291,6 +1371,46 @@ def draw_L_psi(sys, x=0, y=0, e=0):
         print("相位差：", np.degrees(phase_difference))
 
     evec[:, 0] *= adjust_phase(psi1)
+    psi1, psi2 = evec[:dim, 0], evec[dim:, 0]
+    def verify_assume():
+        def format_complex(c, decimals=3):
+            return f"{c.real:.{decimals}f} + {c.imag:.{decimals}f}j"
+        kappa= model['kappa']
+        U = np.zeros((dim, dim), dtype=complex)
+        for i in range(dim):
+            U[i, i] = psi2[i] / psi1[i]
+        Udagger = np.conj(U)
+        H, X, Y, _ = HXY(sys)
+        P = X-x*np.identity(dim) - 1j * (Y-y*np.identity(dim))
+        P_rot = P@U
+        #print(P_rot)
+
+        def plot_dynamics():
+            PU = [P_rot[i, i] for i in range(dim)]
+            pos = [sys.sites[i].pos for i in range(dim)]
+            probabilities = np.abs(psi1)
+            sorted_indices = np.argsort(probabilities)
+            sorted_indices = sorted_indices[::-1]
+            sorted_psi1 = psi1[sorted_indices]
+            sorted_pos = np.array(pos)[sorted_indices]
+            sorted_PU = (np.array(PU))[sorted_indices]
+            for i in range(5):
+                print(sorted_psi1[i], sorted_pos[i])
+            # 计算辐角和模
+            angles = np.angle(sorted_PU)
+            magnitudes = np.abs(sorted_PU)  # 可用于调整箭头长度
+            fig, ax = plt.subplots()
+            for i in range(17):
+                (pos_x, pos_y), angle, mag = sorted_pos[i], angles[i], magnitudes[i]
+                ax.quiver(pos_x, pos_y, mag * np.cos(angle), mag * np.sin(angle), scale=10, color='blue')
+            ax.axis('equal')  # 确保x和y轴的比例相同，避免箭头变形
+            ax.set_xlim(-2, 2)
+            ax.set_ylim(-4.2, -2)
+            kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
+            plt.show()
+        plot_dynamics()
+    verify_assume()
+
     # angle_max = np.angle(evec[:, 0])
     # phase_difference(angle_original, angle_max)
     # evec[:, 0] *= adjust_phase(psi11)
@@ -1307,7 +1427,7 @@ def draw_L_psi(sys, x=0, y=0, e=0):
         fig, ax = plt.subplots()
         ax.set_aspect('equal')
         plt.xlim(-2, 2)
-        plt.ylim(-3.5, -1)
+        plt.ylim(-4.1, -2.5)
         #plt.ylim(-2, 2)
         
         for i, j in sys.graph:
@@ -1354,6 +1474,76 @@ def draw_L_psi(sys, x=0, y=0, e=0):
         print('X-x: ', (X-x*np.identity(dim))@psi2)
         draw_tool((Y-y*np.identity(dim))@psi2, 'Y-y@psi2')
         print('Y: ', (Y-y*np.identity(dim))@psi2)
+from scipy.optimize import brentq
+def analyze_theory(e_offer = False):
+    change_model(HALDANE, NOMASS)
+    model['L'], model['W'] = 9, 9
+    model['h'] = 1
+    sys = model_builder()
+    l, w = change_para(CHANGE)
+    x = 0
+    #for x_range in [[-0.2, 0.2], [-1.2, 1.2], [-2.2, 2.2], [-l-0.1, l+0.1]]:
+    e, expectation = draw_H_psi(sys, state=0, x_range=[-3.2, 3.2])
+    #print(x_range, f'{expectation.real:.3f}')
+    if e_offer == False:
+        e = 0
+    def check_eigenvalues():
+        change_para(CHANGE)
+        para['x_min'] = para['x_max'] = x
+        model['kappa'] = 1
+        for n in [0.5, 1, 2, 2.5]:
+            eigenvalues_change(sys, e, 'abs', n)
+    def adjust_abs():
+        def brentq_search(y):
+            L, dim = spectral_localizer_edit(sys, x, y, e, 'abs', n)
+            return eigsh(L, k=1, sigma=0, return_eigenvectors=False, tol=1e-5)
+        def f(y):
+            L, dim = spectral_localizer_edit(sys, x, y, e, 'abs', n)
+            evals, evecs = eigh(L)
+            filtered_evals = evals[~np.isclose(evals, 0)]
+            pos = np.sum(filtered_evals > 0)
+            neg = np.sum(filtered_evals < 0)
+            return ((pos - neg)/2)
+        def binary_search(f, low, high, xtol):
+            while (high - low) > xtol:
+                mid = (low + high) / 2
+                if f(mid) == 1 and f(low) == 0:
+                    high = mid  # 如果mid为1，缩小区间到左半部分
+                else:
+                    low = mid  # 如果mid为0，缩小区间到右半部分
+            return (low + high) / 2  # 返回区间中点作为跳变点的估计
+
+        plt.figure()
+        y_values = []
+        for n in [0.5, 1, 2, 2.5]:
+            kappa_list = np.linspace(0.1, 2, 40)
+            pos_list = np.zeros((len(kappa_list)))
+            for i, kappa in enumerate(kappa_list):
+                model['kappa'] = kappa
+                a, b = -w, -w/2
+                if n == 0.5 or n == 1 or n == 2:
+                    zero = brentq(brentq_search, a, b, xtol=1e-5)
+                else:
+                    zero = binary_search(f, a, b, xtol=1e-5)
+                pos_list[i] = zero
+            y_values.append(pos_list)
+            plt.plot(kappa_list, pos_list, label=n)
+        y_values = np.array(y_values)
+        std_devs = np.std(y_values, axis=0)
+        min_std_index = np.argmin(std_devs)
+        min_std_x = kappa_list[min_std_index]
+        min_std_y = np.sum(y_values[:, min_std_index])/4
+        plt.legend()
+        plt.xlabel('kappa')
+        plt.ylabel('position')
+        label = pick_label(model['name'], ifkappa=False)
+        plt.figtext(0.5, 0.96, label, ha="center", va="top", fontsize=10, color="blue")
+        plt.figtext(0.5, 0.92, f"x: {x}, e: {e:.3f}, expectation: {expectation.real:.3f}, kappa: {min_std_x:.3f}, pos: {min_std_y:.3f}", ha="center", va="top", fontsize=10, color="blue")
+        plt.show()
+    adjust_abs()
+    #check_eigenvalues()
+    
+analyze_theory()
 
 def perturbation_position(sys, x, y, epsilon_x, epsilon_y):
     L, dim = spectral_localizer(sys, x=x, y=y, e=0)
@@ -1417,20 +1607,18 @@ def perturbation_kappa(sys, x, y, epsilon):
     for i, eigenvector in enumerate(V_evecs.T):
         print(f"Eigenstate {i+1}: {eigenvector}")
 
-
-current_Jr(DEFECT, SINGLE)
-
-# change_model(HALDANE, NONE)
-# change_para(CHANGE)
-# model['h'] = 1.0
-# sys = model_builder()
-# # for kappa in [5, 3, 2, 1, 0.5, 0.1]:
-# #     model['kappa'] = kappa
-# #     eigenvalues_change(sys, 0)
-# model['kappa'] = 2.0
-# # eigenvalues_change(sys, 0)
-# perturbation(sys, x=0.0, y=-2.87108, epsilon_x=0, epsilon_y=0.1)
-# draw_L_psi(sys, x=0.0, y=-2.87108)
+from matplotlib.patches import Circle
+def adjust_r(buckets):
+    change_model(DEFECT, SINGLE)
+    sys = model_builder()
+    fig, ax = plt.subplots()
+    kwant.plot(sys, ax=ax)
+    for r in buckets:
+        circle = Circle((0, 0), r, edgecolor='r', facecolor='none', linewidth=1)
+        ax.add_patch(circle)
+    ax.set_aspect('equal')
+# adjust_r([0.6, 1.6, 3, 5])
+# current_Jr(DEFECT, SINGLE)
 
 # change_model(DEFECT, SINGLE)
 # change_para(GAP)
