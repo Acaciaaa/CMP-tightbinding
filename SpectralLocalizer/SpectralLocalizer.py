@@ -25,7 +25,7 @@ class SimpleNamespace(object):
 
 CONTINUEPOINT = 0.1
 
-HALDANE, HALDANETRI, DEFECT, PYBINDING = 'haldane', 'haldane and triangular', 'defect graphene', 'pybinding'
+SSH, HALDANE, HALDANETRI, DEFECT, PYBINDING = 'SSH', 'haldane', 'haldane and triangular', 'defect graphene', 'pybinding'
 NONTRIVIAL, TRIVIAL, NOMASS, SINGLE, CLUSTER, NONE = 'nontrivial', 'trivial', 'nomass', 'single', '7 hexagons', 'none'
 model = dict(name = NONE,  category = NONE,
          cc = 1.0, # cell-cell distance not site-site distance
@@ -48,7 +48,25 @@ def model_builder():
         return haldane_triangular()
     if model['name'] == HALDANE:
         return haldane()
+    if model['name'] == SSH:
+        return ssh()
     # return haldane_triangular_pybinding()
+
+def ssh():
+    lat = kwant.lattice.chain(norbs=1)
+    sys = kwant.Builder()
+    L, t1, t2 = model['L'], model['t1'], model['t2']
+    for i in range(2*L):
+        sys[lat(i)] = 0
+
+    for i in range(2*L-1):
+        if i % 2 == 0: # A->B 弱
+            sys[lat(i), lat(i + 1)] = -t1
+        else: # B->A 强
+            sys[lat(i), lat(i + 1)] = -t2
+    
+    #kwant.plot(sys)
+    return sys.finalized()
 
 def defect_graphene():
     cc = model['cc']
@@ -136,41 +154,50 @@ def current_Jr(name, category):
             pos_info.append([np.dot(unit_vector, thetahat), r])
         return distance, pos_info
     
-    def find_distribution(evals):
-        plt.hist(evals, bins=50, range = (-2, 2), color='blue', alpha=0.7)
-        tick_marks = np.linspace(-2, 2, 51) 
-        plt.xticks(tick_marks, rotation=90, fontsize=7) 
-        plt.title('Energy Frequency Distribution: h=' + f"{model['h']}")
+    def find_distribution(sys):
+        H = sys.hamiltonian_submatrix(sparse=False)
+        evals, _ = eigh(H)
+        np.set_printoptions(suppress=True, precision=7) 
+        print(evals[(evals >= -0.002) & (evals <= 0)])
+        plt.hist(evals, bins=20, range=(-0.2, 0.2), color='blue', alpha=0.7)
+        tick_marks = np.linspace(-0.2, 0.2, 21) 
+        plt.xticks(tick_marks, rotation=45, fontsize=7) 
+        plt.title(f"Energy Frequency Distribution: h={model['h']} L={model['L']}")
         plt.xlabel('Energy')
         plt.ylabel('Frequency')
-        plt.savefig(f'/content/energy_distribution_{label}.png')
+        plt.ylim(0, 10)
         plt.grid(True)
         plt.show()
         plt.close()
-        
-        closest_to_zero = sorted(evals, key=abs)[:50]
-        print(closest_to_zero)
     
     def draw_distribution():
-        h_num, energy_num = 50, 6
+        h_num, energy_num = 1200, 15
         h_list = np.linspace(0.3, 1.5, h_num)
         energy_list = np.zeros((energy_num, h_num))
         for i, h in enumerate(h_list):
             model['h'] = h
             sys = model_builder()
             H = sys.hamiltonian_submatrix(sparse=False)
+            #evals = eigsh(H, k=energy_num*3, sigma=0, return_eigenvectors=False, tol=1e-5)
             evals, _ = eigh(H)
-            evals = np.abs(sorted(evals, key=abs))
-            energy_list[:, i] = evals[0:energy_num*2:2]
+            negative_evals = evals < 0
+            filtered_evals = evals[negative_evals]
+            final_evals = sorted(filtered_evals, key=abs)
+            energy_list[:, i] = final_evals[0:energy_num]
+        energy_list = -energy_list
+        cutoff = 0.1
         plt.figure()
         plt.xlabel('h')
         plt.ylabel('energy')
-        # plt.ylim(0, 0.01)
-        for i in range(energy_num):
-            plt.plot(h_list, energy_list[i], label=f'{i}')
+        plt.ylim(0, cutoff)
+        plt.title(f"L={model['L']}")
+        lines = []
+        legends = []
+        for n in range(energy_num):
+            if any(energy_list[n] < cutoff):
+                plt.scatter(h_list, energy_list[n], label=f'{n}', s=1)
         plt.legend()
         plt.show()
-        plt.close()
     
     def pure_current_info(sys):
         H = sys.hamiltonian_submatrix(sparse=False)
@@ -187,7 +214,7 @@ def current_Jr(name, category):
             start, stop = args[0], args[1]
             way = f"cutoff_start={start:.2f}_stop={stop:.2f}"
             for i, e in enumerate(evals):
-                if e > start and e <= stop:
+                if -e > start and -e <= stop:
                     if sum_current is None:
                         sum_current = current[i]
                     else:
@@ -215,63 +242,83 @@ def current_Jr(name, category):
 
         elif tag == STATE:
             start, stop = args[0], args[1]
-            way = f"state_start={start}_stop={stop}"
-            sorted_evals, sorted_current = custom_sort(evals, current, True)
-            sum_current = sorted_current[2*start]#+J(sorted_evecs[:, 2*start+1])
+            cutoff = args[2]
+            negative_evals = evals < 0
+            filtered_evals = evals[negative_evals]
+            filtered_current = current[negative_evals, :]
+            way = f"state_start={start}_stop={stop}_cutoff={cutoff}"
+            sorted_evals, sorted_current = custom_sort(filtered_evals, filtered_current, True)
+            if cutoff is not None:
+                for i, e in enumerate(sorted_evals):
+                    if abs(e) > cutoff:
+                        sorted_current[i, :] = 0 
+            sum_current = sorted_current[start]
             for i in range(start+1, stop):
-                sum_current += sorted_current[2*i]#+J(sorted_evecs[:, 2*i+1])
-            
+                sum_current += sorted_current[i]
         return way, sum_current
     
     def draw_current():
-        h_list = [0.0, 0.8]#, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4]
-        bounds = [(-7, 7), (-6, 6)]
-        #start, stop = 0, 1
-        for start in range(10):
-            stop = start+1
-            for h in h_list:
-                model['h'] = h
-                sys = model_builder()
-                fig, ax = plt.subplots()
-                ax.set_aspect('equal')
-                plt.xlim(bounds[0][0], bounds[0][1])
-                plt.ylim(bounds[1][0], bounds[1][1])
-                #signature_change3(sys, e=0, bounds=bounds)
-                evals, current = pure_current_info(sys)
-                way, sum_current = current_filter(evals, current, STATE, start, stop)
-                index = -1
-                for head, tail in sys.graph:
-                    index += 1
-                    if abs(sum_current[index]) < 1e-10:
-                        continue
-                    start_point, end_point = sys.sites[head].pos, sys.sites[tail].pos
-                    #x_start, y_start, x_end, y_end = round(p1[0], 3), round(p1[1], 3), round(p2[0], 3), round(p2[1], 3)
-                    if np.linalg.norm(start_point) > 20:
-                        continue
-                    weight = sum_current[index]
-                    if weight < 0:
-                        start_point, end_point = end_point, start_point
-                        weight = -weight
-                    #mid_x = (x_start + x_end) / 2
-                    #mid_y = (y_start + y_end) / 2
-                    #r = sqrt(mid_x*mid_x+mid_y*mid_y)
-                    #if r > 4:
-                    #    continue
-                    normalized = (end_point-start_point)/np.linalg.norm(end_point - start_point)
-                    arrow_length = normalized * weight * 100
+        h_list = [0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7]
+        bounds = [(-2.5, 2.5), (-2.5, 2.5)]
+        for h in h_list:
+            model['h'] = h
+            sys = model_builder()
+            fig, ax = plt.subplots()
+            ax.set_aspect('equal')
+            plt.xlim(bounds[0][0], bounds[0][1])
+            plt.ylim(bounds[1][0], bounds[1][1])
+            #signature_change3(sys, e=0, bounds=bounds)
+            evals, current = pure_current_info(sys)
+            way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 1/13)
+            index = -1
+            for head, tail in sys.graph:
+                index += 1
+                if abs(sum_current[index]) < 0.00001:
+                    continue
+                start_point, end_point = sys.sites[head].pos, sys.sites[tail].pos
+                #x_start, y_start, x_end, y_end = round(p1[0], 3), round(p1[1], 3), round(p2[0], 3), round(p2[1], 3)
+                if np.linalg.norm(start_point) > 4.5:
+                    continue
+                weight = sum_current[index]
+                if weight < 0:
+                    start_point, end_point = end_point, start_point
+                    weight = -weight
+                #mid_x = (x_start + x_end) / 2
+                #mid_y = (y_start + y_end) / 2
+                #r = sqrt(mid_x*mid_x+mid_y*mid_y)
+                #if r > 4:
+                #    continue
+                normalized = (end_point-start_point)/np.linalg.norm(end_point - start_point)
+                arrow_length = normalized * weight * 40
+                if np.linalg.norm(arrow_length) < 0.16:
+                    continue
 
-                    
-
-                    arrow = patches.FancyArrowPatch(start_point, start_point+arrow_length,
-                                                    arrowstyle='-|>', connectionstyle='arc3,rad=0.0', mutation_scale=10, color='blue')
-                    ax.add_patch(arrow)
-                    # if 0<=mid_x<=3 and 0<=mid_y<=3:
-                    #     ax.text(mid_x, mid_y, f'{weight:.4f}'.lstrip('0').replace('-0.', '-.'), color='red', fontsize=8, ha='center', va='center')
-                kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
-                plt.title(f"h={h}")
-                plt.savefig(f"\content\Chern_Current_h={h:.2f}.png")
-                plt.show()
-                plt.close()
+                if np.linalg.norm(start_point) > 0.8:
+                    mutation_scale = 10
+                    color = 'red'
+                    alpha = 1
+                else:
+                    mutation_scale = 8
+                    color = 'blue'
+                    alpha = 0.2
+                arrow = patches.FancyArrowPatch(start_point, start_point+arrow_length,
+                                                arrowstyle='-|>', connectionstyle='arc3,rad=0.0', 
+                                                mutation_scale=mutation_scale, color=color, alpha=alpha)
+                ax.add_patch(arrow)
+                # if 0<=mid_x<=3 and 0<=mid_y<=3:
+                #     ax.text(mid_x, mid_y, f'{weight:.4f}'.lstrip('0').replace('-0.', '-.'), color='red', fontsize=8, ha='center', va='center')
+            kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.6, 0.7, 1.0, 0.3))
+            # 隐藏x轴和y轴的刻度标签
+            ax.set_xticklabels([])
+            ax.set_yticklabels([])
+            # 隐藏x轴和y轴的刻度
+            ax.set_xticks([])
+            ax.set_yticks([])
+            plt.title(f"h={h}")
+            plt.tight_layout()
+            plt.savefig(f"\content\h{h:.2f}.png", bbox_inches='tight')
+            plt.show()
+            plt.close()
     
     def magnitude_info(sum_current, buckets=np.array([])):
         temp = [None] * len(sort_r)
@@ -311,6 +358,7 @@ def current_Jr(name, category):
         return magnitude, sum_direct, sum_angular, sum_buckets
     
     change_model(name, category)
+    model['L'] = model['W'] = 25
     def pos():
         temp_sys = model_builder()
         distance, pos_info = edge_info(temp_sys)
@@ -319,35 +367,41 @@ def current_Jr(name, category):
         return pos_info, sort_r, sort_distance
     pos_info, sort_r, sort_distance = pos()
     #r是实际距离 sort_r里是从小到大的r sort_distance里是从小到大的r和对应的编号
+    # for L in [9, 13, 17, 21, 25]:
+    #     model['L'] = model['W'] = L
+    #     sys = model_builder()
+    #     find_distribution(sys)
+        # draw_distribution()
+    #draw_current()
     
-    # draw_distribution()
-    # draw_current()
-    
-    def draw_h_fixed(tag, *args):
-        h_list = [0.0, 0.6, 0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5, 2.0, 5.0]
-        start, stop = 0, 6
+    def draw_h_fixed(whichsum):
+        h_list = [0.7, 1.3]
         for h in h_list:
             model['h'] = h
             sys = model_builder()
             label = pick_label(model['name'])
             evals, current = pure_current_info(sys)
-            way, sum_current = current_filter(evals, current, tag, *args)
-            # draw_current()
-            magnitude, _, _, _ = magnitude_info(sum_current, np.array([]))
-            multiply_item = magnitude# * sort_r
+            way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 1/13)
+            magnitude, _, _, _ = magnitude_info(sum_current)
+            if whichsum == 'J(r)':
+                multiply_item=magnitude
+            elif whichsum == 'J(r)_r':    
+                multiply_item = magnitude * sort_r
             
             plt.figure()
             plt.scatter(sort_r, multiply_item, s=1)
+            plt.title(f'h={h}')
             plt.plot(sort_r, multiply_item, marker='o')
             plt.axhline(0, color='grey', linewidth=1)
-            plt.ylim(-0.18, 0.1)
-            plt.xlabel('distance r')
-            plt.ylabel('J(r)')
-            plt.figtext(0.5, 0.95, f"h={h:.2f} {way}", ha="center", va="top", fontsize=10, color="blue")
-            plt.savefig(f'/content/current_Jr_{way}_{label}.png')
+            #plt.ylim(-0.18, 0.1)
+            plt.xlabel('r')
+            plt.ylabel('Average of J(r)*r') 
+            #plt.figtext(0.5, 0.95, f"h={h:.2f} {way}", ha="center", va="top", fontsize=10, color="blue")
+            plt.savefig(f'/content/current_J(r)_r_{h}.png')
             plt.show()
             plt.close()
-    # draw_h_fixed(GAUSSIAN, 0.2, 0.0, 0.1)
+    #draw_h_fixed('J(r)')
+    draw_h_fixed('J(r)_r')
 
     def draw_r_fixed(r):
         h_list = np.linspace(0.3, 1.5, 50)
@@ -376,14 +430,14 @@ def current_Jr(name, category):
 
     # always change due to diff requirements
     def draw_sum(whichsum, tag, *args):
-        h_num = 150
-        h_list = np.concatenate((np.linspace(0.3, 1.8, h_num), np.linspace(1.8, 9.8, 16)))
+        h_num = 180
+        #h_list = np.concatenate((np.linspace(0.3, 1.8, h_num), np.linspace(1.8, 9.8, 16)))
         h_list = np.linspace(0.3, 1.8, h_num)
         
         def diff_size():
             nonlocal pos_info, sort_r, sort_distance
             plt.figure()
-            for L in [5, 9, 13, 17]:
+            for L in [9, 13, 17, 21, 25]:
                 model['L'] = L
                 model['W'] = L
                 pos_info, sort_r, sort_distance = pos()
@@ -392,11 +446,12 @@ def current_Jr(name, category):
                     model['h'] = h
                     sys = model_builder()
                     evals, current = pure_current_info(sys)
-                    way, sum_current = current_filter(evals, current, tag, *args)
+                    if tag == GAUSSIAN:
+                        way, sum_current = current_filter(evals, current, tag, 0, 0, None, 0, 1/L)
                     if whichsum == 'J(r)':
-                        _, sum, _ = magnitude_info(sum_current)
+                        _, sum, _, _ = magnitude_info(sum_current)
                     elif whichsum == 'J(r)_r':    
-                        _, _, sum = magnitude_info(sum_current)
+                        _, _, sum, _ = magnitude_info(sum_current)
                     # if sum > 0 and sum_list[i-1] < 0:
                     #     zero_points = [h_list[i-1], h]
                     sum_list.append(sum)
@@ -404,48 +459,73 @@ def current_Jr(name, category):
             plt.axhline(0, color='grey', linewidth=1)
             plt.xlabel('h')
             plt.legend()
-            plt.ylabel('sum of '+whichsum)
+            plt.ylabel('J')
             # plt.figtext(0.5, 0.92, f"cross:[{zero_points[0]:.3f}, {zero_points[1]:.3f}]", ha="center", va="top", fontsize=10, color="blue")
-            plt.figtext(0.5, 0.97, way, ha="center", va="top", fontsize=10, color="blue")
+            # plt.figtext(0.5, 0.97, way, ha="center", va="top", fontsize=10, color="blue")
             # plt.savefig(f'/content/sum_{whichsum}_{way}_{label}.png')
             plt.show()
             plt.close()
         
         def diff_nonsize():
-            buckets = np.array([0.6, 1.6, 3, 5])
-            buckets_num = len(buckets)+1
+            #buckets = np.array([0.6, 1.6, 3, 5])
+            #buckets_num = len(buckets)+1
             if tag == STATE:
-                line_num = 5
+                line_num = 10
+                cutoff = 0.1
             elif tag == GAUSSIAN:
                 line_num = 1
-            sum_list = np.zeros((line_num, h_num, buckets_num))
+
+            # STORE DATA
+            # if model['L'] == 25:
+            #     pack_storage = 300
+            #     tmp_storage = np.zeros((pack_storage, line_num, 3888))
+            # READ DATA
+            if model['L'] == 25:
+                file_content = np.zeros((h_num, line_num, 3888))
+                pack_storage = 300
+                file_path = '/content/drive/My Drive/Colab Notebooks/'
+                for n in range(5):
+                    data = np.load(file_path+f'data{n}.npz')
+                    file_content[n*pack_storage:(n+1)*pack_storage] = data['data']
+                    data.close()
+
+            sum_list = np.zeros((line_num, h_num))#, buckets_num))
             for i, h in enumerate(h_list):
-                model['h'] = h
-                sys = model_builder()
-                evals, current = pure_current_info(sys)
+                #if i >= 3*pack_storage and i < 4*pack_storage:
+
+                # model['h'] = h
+                # sys = model_builder()
+                # evals, current = pure_current_info(sys)
                 for n in range(line_num):
-                    if tag == STATE:
-                        way, sum_current = current_filter(evals, current, tag, n, n+1)
-                    elif tag == GAUSSIAN:
-                        way, sum_current = current_filter(evals, current, tag, 0, 0.2, None, None, 0.01)
+                #     if tag == STATE:
+                #         way, sum_current = current_filter(evals, current, tag, n, n+1, cutoff)
+                #     elif tag == GAUSSIAN:
+                #         way, sum_current = current_filter(evals, current, tag, 0, 0, None, 0.2, 0.05)
+                    sum_current = file_content[i, n]
+            #         tmp_storage[i%pack_storage, n, :] = sum_current
+            # file_path = '/content/drive/My Drive/Colab Notebooks/'
+            # np.savez(file_path+'data3.npz', data=tmp_storage)
                     if whichsum == 'J(r)':
-                        _, sum, _, sum_buckets = magnitude_info(sum_current, buckets)
+                        _, sum, _, sum_buckets = magnitude_info(sum_current)#, buckets)
                     elif whichsum == 'J(r)_r':    
-                        _, _, sum, sum_buckets = magnitude_info(sum_current, buckets)
-                    sum_list[n, i, :] = sum_buckets
-                    #sum_list[n, i] = sum
+                        _, _, sum, sum_buckets = magnitude_info(sum_current)#, buckets)
+                    #sum_list[n, i, :] = sum_buckets
+                    sum_list[n, i] = sum
             def single_sum():
                 plt.figure()
                 for n in range(line_num):
-                    plt.scatter(h_list, sum_list[n], label=f"{n}", s=1)
+                    sum_masked = np.ma.masked_where(sum_list[n] == 0, sum_list[n])
+                    if np.any(sum_masked.mask == False):
+                        plt.scatter(h_list, sum_masked, label=f"{n}", s=1)
                 plt.axhline(0, color='grey', linewidth=1)
                 #plt.ylim(-0.05, 0.1)
                 plt.xlabel('h')
                 plt.legend()
                 plt.ylabel('sum of '+whichsum)
                 # plt.figtext(0.5, 0.92, f"cross:[{zero_points[0]:.3f}, {zero_points[1]:.3f}]", ha="center", va="top", fontsize=10, color="blue")
-                plt.figtext(0.5, 0.97, way, ha="center", va="top", fontsize=10, color="blue")
+                #plt.figtext(0.5, 0.97, way, ha="center", va="top", fontsize=10, color="blue")
                 # plt.savefig(f'/content/sum_{whichsum}_{way}_{label}.png')
+                plt.title(f"L={model['L']}")
                 plt.show()
                 plt.close()
             def multiple_sum_r():
@@ -468,15 +548,49 @@ def current_Jr(name, category):
                     # plt.savefig(f'/content/sum_{whichsum}_{way}_{label}.png')
                     plt.show()
                     plt.close()
-            #single_sum()
-            multiple_sum_r()
+            single_sum()
+            #multiple_sum_r()
 
-        diff_nonsize()
+        diff_size()
+        #diff_nonsize()
 
-    draw_sum('J(r)', STATE)
+    #draw_sum('J(r)', STATE)
     #draw_sum('J(r)', GAUSSIAN)
-    #draw_sum('J(r)', GAUSSIAN, 0, 0, 0, 0.2, 0.05)# -> diff_size
     
+    def plot_hc():
+        label = ['J', 'J\'']
+        nonlocal pos_info, sort_r, sort_distance
+        plt.figure()
+        L_list = [9, 13, 17, 21, 25]
+        sum_list = np.zeros((2, 5))
+        for l, L in enumerate(L_list):
+            model['L'] = L
+            model['W'] = L
+            pos_info, sort_r, sort_distance = pos()
+            for line in range(2):
+                def brentq_search(h):
+                    model['h'] = h
+                    sys = model_builder()
+                    evals, current = pure_current_info(sys)
+                    way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 1/L)
+                    if line == 0:
+                        _, sum, _, _ = magnitude_info(sum_current)
+                    else:
+                        _, _, sum, _ = magnitude_info(sum_current)
+                    return sum
+                zero = brentq(brentq_search, 0.3, 1.8, xtol=1e-4)
+                sum_list[line, l] = zero
+        for line in range(2):
+            plt.plot(L_list, sum_list[line, :], label=label[line])
+        plt.legend()
+        plt.xticks(L_list)
+        plt.xlabel('L')
+        plt.ylabel('hc')
+        plt.ylim(0, 2)
+        plt.show()
+        print(sum_list)
+    #plot_hc()
+
     # diff L and sigma
     def zero_points_Gaussian():
         nonlocal pos_info, sort_r, sort_distance
@@ -699,6 +813,8 @@ def pick_label(name, ifh = True, ifkappa = True):
         if ifkappa == False:
             return name + '_' + model['category'] + f"_h={model['h']:.2f}_L={model['L']}_W={model['W']}"    
         return name + '_' + model['category'] + f"_h={model['h']:.2f}_kappa={model['kappa']}_L={model['L']}_W={model['W']}"
+    if name == SSH:
+        return name+f"_t1={model['t1']}_t2={model['t2']}_L={model['L']}_kappa={model['kappa']}"
     else:
         system.exit()
 
@@ -860,10 +976,29 @@ def HXY(sys):
         X[i, i] = site.pos[0]
         Y[i, i] = site.pos[1]
     return H, X, Y, np.shape(H)[0]
-def spectral_localizer(sys, x, y, e):
+def spectral_localizer_1d(sys, x, e, *args):
     kappa = model['kappa']
-
-    if model['name'] == PYBINDING:
+    H = sys.hamiltonian_submatrix(sparse=False)
+    dim = np.shape(H)[0]
+    X = np.zeros(H.shape)
+    for i, site in enumerate(sys.sites):
+        X[i, i] = site.pos[0]
+    
+    if args:
+        P = X-x*np.identity(dim)
+        P_diag = np.diag(P)
+        if args[0] == 'abs':
+            P_diag_edit = np.sign(P_diag) * (np.abs(P_diag) ** args[1])
+            P_edit = np.diag(P_diag_edit)
+        else:
+            print('only abs accepted')
+        L = kappa*kron(sx, P_edit)+kron(sy, H-e*np.identity(dim))
+    else:
+        L = kappa*kron(sx, X-x*np.identity(dim))+kron(sy, H-e*np.identity(dim))
+    return L, dim
+def spectral_localizer_2d(sys, x, y, e, *args):
+    kappa = model['kappa']
+    def pybinding_case():
         H = sys.hamiltonian.toarray(model)
         dim = np.shape(H)[0]
         X, Y = np.zeros(H.shape), np.zeros(H.shape)
@@ -871,10 +1006,22 @@ def spectral_localizer(sys, x, y, e):
             X[i, i] = site
         for i, site in enumerate(sys.system.positions.y):
             Y[i, i] = site
-    else:
-        H, X, Y, dim = HXY(sys)
+    H, X, Y, dim = HXY(sys)
 
-    L = kron(sz, H-e*np.identity(dim)) + kappa * (kron(sx, X-x*np.identity(dim)) + kron(sy, Y-y*np.identity(dim)))
+    if args:
+        P = X-x*np.identity(dim) - 1j * (Y-y*np.identity(dim))
+        P_diag = np.diag(P)
+        if args[0] == 'abs':
+            P_diag_edit = [(z / np.abs(z) * (np.abs(z) ** args[1])) if np.abs(z) != 0 else 0 for z in P_diag]
+            P_edit = np.diag(P_diag_edit)
+        else:
+            print('only abs accepted')
+        L = np.block([
+            [H-e*np.identity(dim), kappa*P_edit],
+            [kappa*np.conj(P_edit), -H+e*np.identity(dim)]
+        ])
+    else:
+        L = kron(sz, H-e*np.identity(dim)) + kappa * (kron(sx, X-x*np.identity(dim)) + kron(sy, Y-y*np.identity(dim)))
     return L, dim
 import time
 def localizer_gap(sys, e=0):
@@ -941,40 +1088,6 @@ def sigma_change():# precondition: eigenvalues_change already cross 0
     plt.savefig(f'/content/sigma_change_{label}.png')
     plt.show()
     plt.close()
-
-def spectral_localizer_edit(sys, x, y, e, *args):
-    kappa = model['kappa']
-
-    H = sys.hamiltonian_submatrix(sparse=False)
-    dim = np.shape(H)[0]
-    X, Y = np.zeros(H.shape), np.zeros(H.shape)
-    for i, site in enumerate(sys.sites):
-        X[i, i] = site.pos[0]
-        Y[i, i] = site.pos[1]
-    
-    P = X-x*np.identity(dim) - 1j * (Y-y*np.identity(dim))
-    P_diag = np.diag(P)
-    if args[0] == 'abs':
-        P_diag_edit = [z * (np.abs(z)**(args[1])) for z in P_diag]
-    elif args[0] == 'angle':
-        def adjust_angle(z):
-            r = np.abs(z)
-            theta = np.angle(z)
-            new_theta = theta / 2
-            # if np.real(z) >= 0:
-            #     new_theta = theta * (3/4)
-            # else:
-            #     new_theta = theta - (np.pi + theta) / 4
-            return r * np.exp(1j * new_theta)
-
-        P_diag_edit = np.array([adjust_angle(z) for z in P_diag])
-    
-    P_edit = np.diag(P_diag_edit)
-    L = np.block([
-    [H-e*np.identity(dim), kappa*P_edit],
-    [kappa*np.conj(P_edit), -H+e*np.identity(dim)]
-])
-    return L, dim
   
 def eigenvalues_change(sys, e, *args):
     cc=model['cc']
@@ -992,10 +1105,12 @@ def eigenvalues_change(sys, e, *args):
     tracked_eigvals = np.zeros((num_coords, num_eigvals))
 
     for i, y in enumerate(v_coords):
-        if para['x_min'] == para['x_max']:
-            L, _ = spectral_localizer_edit(sys, coord_fix, y, e, *args) #!!!!!!!!!!!!!!!
+        if model['name'] == SSH:
+            L, _ = spectral_localizer_1d(sys, y, e, *args)
+        elif para['x_min'] == para['x_max']:
+            L, _ = spectral_localizer_2d(sys, coord_fix, y, e, *args)
         elif para['y_min'] == para['y_max']:
-            L, dim = spectral_localizer(sys, y = coord_fix, x = y, e = e)
+            L, _ = spectral_localizer_2d(sys, y, coord_fix, e, *args)
         current_eigvals = eigsh(L, k=num_eigvals, sigma=0, return_eigenvectors=False, tol=1e-5)
 
         b = np.sort(current_eigvals)[::-1]
@@ -1033,7 +1148,7 @@ def eigenvalues_change(sys, e, *args):
             #print(crossing_indices, x_coords[index], line[index], x_coords[index+1], line[index+1])
             zero_point.append((v_coords[index]+v_coords[index+1])/2)
 
-        plt.plot(v_coords, line, label=f'Eig {i+1}')
+        plt.scatter(v_coords, line, s=0.1, label=f'Eig {i+1}')
     plt.ylabel('localizer eigenvalues')
     label = pick_label(model['name'])
     plt.figtext(0.5, 0.01, label, ha="center", va="bottom", fontsize=10, color="blue")
@@ -1041,6 +1156,7 @@ def eigenvalues_change(sys, e, *args):
     str_zero_point = 'zero point: ' + ', '.join([f'{item:.3f}' for item in zero_point])
     plt.figtext(0.5, 0.96, str_zero_point, ha="center", va="top", fontsize=10, color="blue")
     plt.figtext(0.5, 0.92, xlabel+f', e={e}', ha="center", va="top", fontsize=10, color="blue")
+    plt.axis('equal')
     plt.savefig(f'/content/eigenvalues_change_{label}_{e}_{xlabel}.png')
     plt.show()
     plt.close()
@@ -1163,7 +1279,7 @@ def change_model(name, category):
     elif name==DEFECT:
         model.update(dict(name=name, category = category,
                       cc = 1.0,
-                      m = 0.0, t1 = 1.0, h = 0.8,
+                      m = 0.0, t1 = 1.0, h = 1,
                       kappa = 1.0,
                       L=13, W=13))
     elif name==HALDANE:
@@ -1178,6 +1294,11 @@ def change_model(name, category):
             model['h'] = 1
         elif category==TRIVIAL:
             model['h'] = 0.5
+    elif name == SSH:
+        model.update(dict(name=name, category=category,
+                          cc=1.0,
+                          t1=0.5, t2=1,
+                          L=6))
     else:
         print('change_model error')
         system.exit()
@@ -1210,6 +1331,11 @@ def change_para(func):
                              y_min = 0, y_max = 0, num_cc=200,
                              x_min = -x, x_max = 0,
                              num_eigvals = 20,))
+        elif model['name'] == SSH:
+            para.update(dict(func = func,
+                             y_min = 0, y_max = 0, num_cc=200,
+                             x_min = -0.5, x_max = 2,#2*model['L']-0.5,
+                             num_eigvals = 2,))
     else:
         print('change_para error')
         system.exit()
@@ -1312,7 +1438,7 @@ def draw_H_psi(sys, state, x_range):
     #draw_sth()
     return calculate_expectation()
             
-def draw_L_psi(sys, x=0, y=0, e=0):
+def draw_L_psi(sys, x, y, e, *args):
     def draw_tool(v, title):
         data = np.abs(v)**2
         vmax = np.max(data)
@@ -1335,7 +1461,7 @@ def draw_L_psi(sys, x=0, y=0, e=0):
     
     np.set_printoptions(precision=4, suppress=True)
     np.set_printoptions(linewidth=160)
-    L, dim = spectral_localizer(sys, x=x, y=y, e=e)
+    L, dim = spectral_localizer_edit(sys, x, y, e, *args)
     np.random.seed(0)
     eval, evec = eigsh(L, k=1, which='SM', return_eigenvectors=True)#, tol=1e-10)
     psi1, psi2 = evec[:dim, 0], evec[dim:, 0]
@@ -1382,7 +1508,10 @@ def draw_L_psi(sys, x=0, y=0, e=0):
         Udagger = np.conj(U)
         H, X, Y, _ = HXY(sys)
         P = X-x*np.identity(dim) - 1j * (Y-y*np.identity(dim))
-        P_rot = P@U
+        P_diag = np.diag(P)
+        P_diag_edit = [(z / np.abs(z) * (np.abs(z) ** args[1])) if np.abs(z) != 0 else 0 for z in P_diag]
+        P_edit = np.diag(P_diag_edit)
+        P_rot = P_edit@U
         #print(P_rot)
 
         def plot_dynamics():
@@ -1399,6 +1528,7 @@ def draw_L_psi(sys, x=0, y=0, e=0):
             # 计算辐角和模
             angles = np.angle(sorted_PU)
             magnitudes = np.abs(sorted_PU)  # 可用于调整箭头长度
+            print(magnitudes)
             fig, ax = plt.subplots()
             for i in range(17):
                 (pos_x, pos_y), angle, mag = sorted_pos[i], angles[i], magnitudes[i]
@@ -1474,12 +1604,74 @@ def draw_L_psi(sys, x=0, y=0, e=0):
         print('X-x: ', (X-x*np.identity(dim))@psi2)
         draw_tool((Y-y*np.identity(dim))@psi2, 'Y-y@psi2')
         print('Y: ', (Y-y*np.identity(dim))@psi2)
+
 from scipy.optimize import brentq
-def analyze_theory(e_offer = False):
+def analyze_theory_ssh():
+    change_model(SSH, NONE)
+    model['L'] = 3
+    sys = model_builder()
+    def calculate_expectation():
+        H = sys.hamiltonian_submatrix(sparse=False)
+        print(H)
+        dim = np.shape(H)[0]
+        X = np.zeros(H.shape)
+        for i, site in enumerate(sys.sites):
+            X[i, i] = site.pos[0]
+        evals, evecs = eigh(H)
+        def custom_sort(evals, evecs):
+            indices = np.argsort(np.abs(evals))
+            sorted_evals = evals[indices]
+            sorted_eigens = evecs[:, indices]
+            return sorted_evals, sorted_eigens
+        sorted_evals, sorted_evecs = custom_sort(evals, evecs)
+        print(sorted_evals[0], sorted_evecs[0])
+        print(sorted_evals[1], sorted_evecs[1])
+        # print(np.conj(sorted_evecs[0]).T@X@sorted_evecs[0])
+    calculate_expectation()
+
+    def adjust_abs():
+        def find_crossing(a, b, x_num):
+            x_list = np.linspace(a, b, x_num)
+            eigenvalue_list = np.zeros(x_num)
+            for i, x in enumerate(x_list):
+                L, _ = spectral_localizer_1d(sys, x, 0, 'abs', n)
+                eigenvalue_list[i] = abs(eigsh(L, k=1, sigma=0, return_eigenvectors=False, tol=1e-5)[0])
+            min_index = np.argmin(eigenvalue_list)
+            min_value = eigenvalue_list[min_index]
+            return x_list[min_index]
+            
+        plt.figure()
+        x_values = []
+        for n in [0.5, 1, 2, 2.5]:
+            kappa_list = np.linspace(0.1, 2, 40)
+            pos_list = np.zeros((len(kappa_list)))
+            for i, kappa in enumerate(kappa_list):
+                model['kappa'] = kappa
+                a, b = 0, 1.2
+                zero = find_crossing(a, b, 60)
+                pos_list[i] = zero
+            x_values.append(pos_list)
+            plt.plot(kappa_list, pos_list, label=n)
+        x_values = np.array(x_values)
+        std_devs = np.std(x_values[1:], axis=0)
+        min_std_index = np.argmin(std_devs)
+        min_std_x = kappa_list[min_std_index]
+        min_std_y = np.sum(x_values[1:, min_std_index])/4
+        plt.legend()
+        plt.xlabel('kappa')
+        plt.ylabel('position')
+        label = pick_label(model['name'], ifkappa=False)
+        plt.figtext(0.5, 0.96, label, ha="center", va="top", fontsize=10, color="blue")
+        #plt.figtext(0.5, 0.92, f"x: {x}, e: {e:.3f}, expectation: {expectation.real:.3f}, kappa: {min_std_x:.3f}, pos: {min_std_y:.3f}", ha="center", va="top", fontsize=10, color="blue")
+        plt.show()
+    #adjust_abs()
+
+def analyze_theory_haldane(e_offer = False):
     change_model(HALDANE, NOMASS)
     model['L'], model['W'] = 9, 9
     model['h'] = 1
     sys = model_builder()
+    #draw_L_psi(sys, 0, -3.5, 0, 'abs', 0)
     l, w = change_para(CHANGE)
     x = 0
     #for x_range in [[-0.2, 0.2], [-1.2, 1.2], [-2.2, 2.2], [-l-0.1, l+0.1]]:
@@ -1490,8 +1682,9 @@ def analyze_theory(e_offer = False):
     def check_eigenvalues():
         change_para(CHANGE)
         para['x_min'] = para['x_max'] = x
-        model['kappa'] = 1
-        for n in [0.5, 1, 2, 2.5]:
+        
+        model['kappa'] = 1.5
+        for n in [0, 0.5, 1, 2, 2.5]:
             eigenvalues_change(sys, e, 'abs', n)
     def adjust_abs():
         def brentq_search(y):
@@ -1515,24 +1708,24 @@ def analyze_theory(e_offer = False):
 
         plt.figure()
         y_values = []
-        for n in [0.5, 1, 2, 2.5]:
+        for n in [0, 0.5, 1, 2, 2.5]:
             kappa_list = np.linspace(0.1, 2, 40)
             pos_list = np.zeros((len(kappa_list)))
             for i, kappa in enumerate(kappa_list):
                 model['kappa'] = kappa
-                a, b = -w, -w/2
-                if n == 0.5 or n == 1 or n == 2:
-                    zero = brentq(brentq_search, a, b, xtol=1e-5)
-                else:
-                    zero = binary_search(f, a, b, xtol=1e-5)
+                a, b = -w, 0
+                # if n != 0 or n!=2:
+                #     zero = brentq(brentq_search, a, b, xtol=1e-5)
+                # else:
+                zero = binary_search(f, a, b, xtol=1e-5)
                 pos_list[i] = zero
             y_values.append(pos_list)
             plt.plot(kappa_list, pos_list, label=n)
         y_values = np.array(y_values)
-        std_devs = np.std(y_values, axis=0)
+        std_devs = np.std(y_values[1:], axis=0)
         min_std_index = np.argmin(std_devs)
         min_std_x = kappa_list[min_std_index]
-        min_std_y = np.sum(y_values[:, min_std_index])/4
+        min_std_y = np.sum(y_values[1:, min_std_index])/4
         plt.legend()
         plt.xlabel('kappa')
         plt.ylabel('position')
@@ -1540,10 +1733,10 @@ def analyze_theory(e_offer = False):
         plt.figtext(0.5, 0.96, label, ha="center", va="top", fontsize=10, color="blue")
         plt.figtext(0.5, 0.92, f"x: {x}, e: {e:.3f}, expectation: {expectation.real:.3f}, kappa: {min_std_x:.3f}, pos: {min_std_y:.3f}", ha="center", va="top", fontsize=10, color="blue")
         plt.show()
-    adjust_abs()
-    #check_eigenvalues()
+    #adjust_abs()
+    check_eigenvalues()
     
-analyze_theory()
+#analyze_theory()
 
 def perturbation_position(sys, x, y, epsilon_x, epsilon_y):
     L, dim = spectral_localizer(sys, x=x, y=y, e=0)
@@ -1608,6 +1801,7 @@ def perturbation_kappa(sys, x, y, epsilon):
         print(f"Eigenstate {i+1}: {eigenvector}")
 
 from matplotlib.patches import Circle
+from scipy.stats import pearsonr
 def adjust_r(buckets):
     change_model(DEFECT, SINGLE)
     sys = model_builder()
@@ -1618,7 +1812,82 @@ def adjust_r(buckets):
         ax.add_patch(circle)
     ax.set_aspect('equal')
 # adjust_r([0.6, 1.6, 3, 5])
-# current_Jr(DEFECT, SINGLE)
+
+#current_Jr(DEFECT, SINGLE)
+
+def compute_u(H, X):
+    eigenvalues, eigenstates = eigh(H)
+    sorted_indices = np.argsort(np.abs(eigenvalues))
+    eigenvalues = eigenvalues[sorted_indices]
+    eigenstates = eigenstates[:, sorted_indices]
+    psi1 = eigenstates[:, 0]
+    psi2 = eigenstates[:, 1]
+    psi1_prime = (psi1 + psi2) / np.sqrt(2)
+    psi2_prime = (psi1 - psi2) / np.sqrt(2)
+    even_indices = np.arange(0, len(eigenvalues), 2)
+    eigenvalues = eigenvalues[even_indices]
+    eigenstates = eigenstates[:, even_indices]
+    
+    total_sum = 0.0
+    data = np.zeros(len(eigenvalues)-1)
+    for n in range(1, len(eigenvalues)):
+        En = eigenvalues[n]
+        psi_n = eigenstates[:, n]
+        tmp =  (2/En) * (np.vdot(psi1_prime, X @ psi_n)) * (np.vdot(psi_n, X @ psi2_prime))
+        if np.isclose(tmp.imag, 0):
+            term = tmp.real
+        else:
+            raise ValueError("tmp is complex")
+
+        data[n-1]=abs(term)
+        total_sum+=term
+    
+    values = []
+    values.append(np.max(data))
+    for n, pct in enumerate([70]):
+        threshold = np.percentile(data, pct)
+        values.append(np.mean(data[data >= threshold]))
+        
+    correlation_coefficient, p_value = pearsonr(np.abs(eigenvalues[1:]), data)
+    
+    return total_sum, values[0], values[1], correlation_coefficient, p_value
+
+def draw_u():
+    change_model(SSH, NONE)
+    num = 67
+    L_list = range(3, 3+num)
+    ur_list, u_list = np.zeros((num, 2)),np.zeros(num)
+    corr_list, p_list = np.zeros(num), np.zeros(num)
+    for n, L in enumerate(L_list):
+        model['L'] = L
+        sys = model_builder()
+        H = sys.hamiltonian_submatrix(sparse=False)
+        X = np.zeros(H.shape)
+        for i, site in enumerate(sys.sites):
+            X[i, i] = site.pos[0]
+        u_list[n], ur_list[n,0], ur_list[n,1], corr_list[n], p_list[n] = compute_u(H, X)
+    
+    plt.figure()
+    plt.plot(L_list, corr_list, c='dimgray', label=f'correlation coefficient')
+    plt.plot(L_list, p_list, c='#4B0082', label=f'p value')
+    plt.axhline(0, color='gray', linestyle='-', linewidth=1)
+    plt.axhline(-1, color='gray', linestyle='-', linewidth=1)
+    plt.xlabel('Nc')
+    plt.legend()
+    plt.show()
+    
+    plt.figure()
+    plt.scatter(L_list, ur_list[:,0], s=3, label='largest')
+    plt.scatter(L_list, ur_list[:,1], s=3, label='70th pct.')
+    plt.scatter(L_list, np.abs(u_list), s=3, label='|u|')
+    plt.axhline(0, color='gray', linestyle='-', linewidth=1)
+    plt.xlabel('Nc')
+    
+    plt.legend()
+    plt.show()
+draw_u()
+
+    
 
 # change_model(DEFECT, SINGLE)
 # change_para(GAP)
