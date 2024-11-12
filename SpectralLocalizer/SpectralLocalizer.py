@@ -401,7 +401,7 @@ def current_Jr(name, category):
             plt.show()
             plt.close()
     #draw_h_fixed('J(r)')
-    draw_h_fixed('J(r)_r')
+    #draw_h_fixed('J(r)_r')
 
     def draw_r_fixed(r):
         h_list = np.linspace(0.3, 1.5, 50)
@@ -716,6 +716,158 @@ def current_Jr(name, category):
             plt.show()
             plt.close()
     #draw_circle_2()
+
+import h5py
+
+class DataStorage:
+    def __init__(self, position_file='position_data.h5', energy_file='energy_data.h5', current_file='current_data.h5',
+                 num_edges=2, num_h=150, num_energies=2):
+        self.position_file = position_file
+        self.energy_file = energy_file
+        self.current_file = current_file
+        self.num_edges = num_edges
+        self.num_h = num_h
+        self.num_energies = num_energies
+    
+    def write_positions(self, positions):
+        with h5py.File(self.position_file, 'a') as position_file: 
+            if 'positions' not in position_file:
+                position_file.create_dataset('positions', data=positions)
+            else:
+                position_file['positions'][...] = positions
+    
+    def read_positions(self):
+        with h5py.File(self.position_file, 'r') as position_file:
+            positions_data = position_file['positions'][:]
+            self.num_edges = positions_data.shape[0]
+        return positions_data
+    
+    def write_energies(self, energies, h_index):
+        with h5py.File(self.energy_file, 'a') as energy_file:
+            if 'energies' not in energy_file:
+                energy_data = energy_file.create_dataset('energies', (self.num_h, self.num_energies), dtype='float64')
+            else:
+                energy_data = energy_file['energies']
+            energy_data[h_index] = energies
+    
+    def read_energies(self, h_index):
+        with h5py.File(self.energy_file, 'r') as energy_file:
+            energies_data = energy_file['energies'][h_index]
+            self.num_energies = energies_data.shape[0]
+        return energies_data
+
+    def write_currents(self, currents, h_index):
+        with h5py.File(self.current_file, 'a') as current_file:
+            if 'currents' not in current_file:
+                current_data = current_file.create_dataset('currents', (self.num_edges, self.num_h, self.num_energies), dtype='float64')
+            else:
+                current_data = current_file['currents']
+            current_data[:, h_index, :] = currents
+    
+    def read_currents(self, h_index):
+        with h5py.File(self.current_file, 'r') as current_file:
+            current_data = current_file['currents'][:, h_index, :]
+        return current_data
+
+def write_data():
+    change_model(DEFECT, SINGLE)
+    model['L'] = model['W'] = 13
+    sys = model_builder()
+    H = sys.hamiltonian_submatrix(sparse=False)
+    num_h = 150
+    num_energies = np.shape(H)[0]
+    
+    #存位置
+    positions_list = []
+    for head, tail in sys.graph:
+        positions_list.append([sys.sites[head].pos, sys.sites[tail].pos])
+    positions = np.array(positions_list)
+    num_edges = positions.shape[0]
+    storage = DataStorage(num_edges=num_edges, num_h=num_h, num_energies=num_energies)
+    storage.write_positions(positions)
+    
+    h_list = np.linspace(0.3, 1.8, num_h)
+    for i, h in enumerate(h_list):
+        model['h'] = h
+        sys = model_builder()
+        
+        #存能量
+        H = sys.hamiltonian_submatrix(sparse=False)
+        evals, evecs = eigh(H)
+        sorted_indices = np.argsort(np.abs(evals))
+        sorted_evals = evals[sorted_indices]
+        sorted_evecs = evecs[:, sorted_indices]
+        storage.write_energies(sorted_evals, h_index=i)
+        
+        #存电流
+        J = kwant.operator.Current(sys)
+        currents = np.array([J(sorted_evecs[:, j]) for j in range(num_energies)]).T
+        storage.write_currents(currents, h_index=i)
+        
+    # #test
+    # print(storage.read_currents(0))
+    # print(storage.read_currents(1))
+
+def read_data():
+    def get_interactions(positions, k=0, threshold=0):
+        if k == 0:
+            line_vector = np.array([0, 1])
+        else:    
+            line_vector = np.array([-1, 1/k])
+        interact = np.zeros(storage.num_edges)
+        for i, edge in enumerate(positions):
+            (x1, y1), (x2, y2) = edge
+            if np.sqrt(((x1+x2)/2)**2 + ((y1+y2)/2)**2) < threshold: #距离小的不要
+                continue
+            if (x1<0 and y1<0) or (x2<0 and y1<0): #不在第一象限的不要（一条边的例外）
+                continue
+            head_in_first_quadrant = (x1 >= 0) and (y1 >= 0)
+            tail_in_first_quadrant = (x2 >= 0) and (y2 >= 0)
+            if not (head_in_first_quadrant or tail_in_first_quadrant): #不在第一象限不要
+                continue
+            y1_line = k * x1
+            y2_line = k * x2
+            if (y1 > y1_line and y2 < y2_line) or (y1 < y1_line and y2 > y2_line): #有交点
+                #print(x1,y1,x2,y2)
+                edge_vector = np.array([x2 - x1, y2 - y1])
+                dot_product = np.dot(line_vector, edge_vector)
+                interact[i] = dot_product / np.linalg.norm(dot_product)
+        return interact
+    
+    def get_sumcurrents():
+        sum_currents = np.zeros((storage.num_h, storage.num_edges))
+        for h_i in range(storage.num_h):
+            energies = storage.read_energies(h_i)
+            gaussian_values = np.exp(-energies**2 / (2 * sigma**2))
+            gaussian_values /= np.max(gaussian_values)
+            gaussian_values[energies>=0] = 0
+            currents = storage.read_currents(h_i)
+            sum_currents[h_i] = np.array([np.dot(currents[j], gaussian_values) for j in range(storage.num_edges)])
+        return sum_currents
+        
+    sigma = 1/13
+    storage = DataStorage()
+    storage.num_h = 150
+    positions = storage.read_positions()
+    h_list = np.linspace(0.3, 1.8, storage.num_h)
+    sum_currents = get_sumcurrents()
+    
+    plt.figure()
+    plt.axhline(0, color='gray', linestyle='-', linewidth=1)
+    for l in [0, 1, 10]:
+        for r in [0, 0.6]:
+            interactions = get_interactions(positions, k=l, threshold=r)
+            flow_list = np.dot(sum_currents, interactions)
+            #test
+            nonzero_indices = np.nonzero(interactions)[0]
+            for i in nonzero_indices:
+                print(f'edge={positions[i]}')
+                print(f'interaction={interactions[i]}')
+                print(f'h=0.3 sum_currents={sum_currents[0, i]}')
+            plt.plot(h_list, flow_list, label=f'k={l} r={r}')
+        
+    plt.legend()
+    plt.show()
 
 def current_kwant(sys, num_states = 20, max_E = 0.5):
     H = sys.hamiltonian_submatrix(sparse=False)
@@ -1885,9 +2037,10 @@ def draw_u():
     
     plt.legend()
     plt.show()
-draw_u()
+#draw_u()
 
-    
+#write_data()
+read_data()   
 
 # change_model(DEFECT, SINGLE)
 # change_para(GAP)
