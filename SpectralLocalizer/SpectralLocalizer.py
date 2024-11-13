@@ -815,11 +815,12 @@ def read_data():
         else:    
             line_vector = np.array([-1, 1/k])
         interact = np.zeros(storage.num_edges)
+        signs = np.zeros(storage.num_edges)
         for i, edge in enumerate(positions):
             (x1, y1), (x2, y2) = edge
             if np.sqrt(((x1+x2)/2)**2 + ((y1+y2)/2)**2) < threshold: #距离小的不要
                 continue
-            if (x1<0 and y1<0) or (x2<0 and y1<0): #不在第一象限的不要（一条边的例外）
+            if (x1<0 and y1<0) or (x2<0 and y2<0): #不在第一象限的不要（一条边的例外）
                 continue
             head_in_first_quadrant = (x1 >= 0) and (y1 >= 0)
             tail_in_first_quadrant = (x2 >= 0) and (y2 >= 0)
@@ -829,10 +830,10 @@ def read_data():
             y2_line = k * x2
             if (y1 > y1_line and y2 < y2_line) or (y1 < y1_line and y2 > y2_line): #有交点
                 #print(x1,y1,x2,y2)
-                edge_vector = np.array([x2 - x1, y2 - y1])
-                dot_product = np.dot(line_vector, edge_vector)
-                interact[i] = dot_product / np.linalg.norm(dot_product)
-        return interact
+                edge_vector = np.array([x2 - x1, y2 - y1])/np.linalg.norm([x2 - x1, y2 - y1])
+                interact[i] = np.dot(edge_vector, line_vector) / np.linalg.norm(line_vector)
+                signs[i] = np.sign(interact[i])
+        return interact, signs
     
     def get_sumcurrents():
         sum_currents = np.zeros((storage.num_h, storage.num_edges))
@@ -854,17 +855,22 @@ def read_data():
     
     plt.figure()
     plt.axhline(0, color='gray', linestyle='-', linewidth=1)
-    for l in [0, 1, 10]:
-        for r in [0, 0.6]:
-            interactions = get_interactions(positions, k=l, threshold=r)
+    for l in [0,1,2,3,4,5,6]:
+        for r in [0.6]:
+            interactions, signs = get_interactions(positions, k=l, threshold=r)
             flow_list = np.dot(sum_currents, interactions)
-            #test
-            nonzero_indices = np.nonzero(interactions)[0]
-            for i in nonzero_indices:
-                print(f'edge={positions[i]}')
-                print(f'interaction={interactions[i]}')
-                print(f'h=0.3 sum_currents={sum_currents[0, i]}')
-            plt.plot(h_list, flow_list, label=f'k={l} r={r}')
+            i = np.where(flow_list < 0)[0][-1]
+            plt.plot(h_list, flow_list, label=f'interact k={l:.3f} r={r:.3f} zero={h_list[i]:.3f}')
+            # flow_list = np.dot(sum_currents, signs)
+            # i = np.where(flow_list < 0)[0][-1]
+            # plt.plot(h_list, flow_list, label=f'signs k={l:.3f} r={r:.3f} zero={(h_list[i]+h_list[i+1])/2:.3f}')
+            # #test
+            # nonzero_indices = np.nonzero(signs)[0]
+            # for i in nonzero_indices:
+            #     print(l, f'edge={positions[i]}')
+            #     print(f'signs={signs[i]}')
+            #     print(f'h=0.3 sum_currents={sum_currents[0, i]}')
+            #     print('\n')
         
     plt.legend()
     plt.show()
