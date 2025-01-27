@@ -11,6 +11,7 @@ import sys as system
 import cmath
 from math import sqrt, pi, sin, cos, dist
 import warnings
+from matplotlib.lines import Line2D
 
 '''Defining Pauli matrices'''
 s0 = np.array([[1,0],[0,1]], complex)
@@ -119,8 +120,19 @@ def defect_graphene():
                     sys[a(tar[0], tar[1]), a(sour[0], sour[1])] = temp
     else:
         system.exit()
+        
+    # for i in sys.hopping_value_pairs():
+    #     print(i)
+    
+    # fig, ax = plt.subplots()
+    # kwant.plot(sys, ax=ax)
+    # ax.set_aspect('equal', 'box')
+    # ax.plot([0, 6.6], [0, 0], color='grey', linewidth=2, linestyle='--')
+    # plt.tight_layout()
+    # plt.show()
     
     #kwant.plot(sys)
+    
     return sys.finalized()
 
 from scipy.stats import gaussian_kde
@@ -140,7 +152,7 @@ def current_Jr(name, category):
         distance = {}
         pos_info = [] # [[dot1, r1], [dot2, r2]]
         r_index = 0
-        for head, tail in sys.graph:
+        for tail, head in sys.graph:
             p1, p2 = sys.sites[head].pos, sys.sites[tail].pos
             unit_vector = (p2-p1)/np.linalg.norm(p2-p1)
             p3 = (p1+p2)/2
@@ -258,7 +270,7 @@ def current_Jr(name, category):
         return way, sum_current
     
     def draw_current():
-        h_list = [0.6,0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5,1.6,1.7]
+        h_list = [0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5]
         bounds = [(-2.5, 2.5), (-2.5, 2.5)]
         for h in h_list:
             model['h'] = h
@@ -269,11 +281,11 @@ def current_Jr(name, category):
             plt.ylim(bounds[1][0], bounds[1][1])
             #signature_change3(sys, e=0, bounds=bounds)
             evals, current = pure_current_info(sys)
-            way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 1/13)
+            way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 1/model['L'])
             index = -1
-            for head, tail in sys.graph:
+            for tail, head in sys.graph:
                 index += 1
-                if abs(sum_current[index]) < 0.00001:
+                if abs(sum_current[index]) < 0.0001:
                     continue
                 start_point, end_point = sys.sites[head].pos, sys.sites[tail].pos
                 #x_start, y_start, x_end, y_end = round(p1[0], 3), round(p1[1], 3), round(p2[0], 3), round(p2[1], 3)
@@ -289,7 +301,7 @@ def current_Jr(name, category):
                 #if r > 4:
                 #    continue
                 normalized = (end_point-start_point)/np.linalg.norm(end_point - start_point)
-                arrow_length = normalized * weight * 40
+                arrow_length = normalized * weight * 60
                 if np.linalg.norm(arrow_length) < 0.16:
                     continue
 
@@ -375,29 +387,30 @@ def current_Jr(name, category):
     #draw_current()
     
     def draw_h_fixed(whichsum):
+        # 记得换sigma
         h_list = [0.7, 1.3]
         for h in h_list:
             model['h'] = h
             sys = model_builder()
             label = pick_label(model['name'])
             evals, current = pure_current_info(sys)
-            way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 1/13)
+            way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 2/model['L'])
             magnitude, _, _, _ = magnitude_info(sum_current)
             if whichsum == 'J(r)':
                 multiply_item=magnitude
-            elif whichsum == 'J(r)_r':    
+            elif whichsum == 'J(r)_r':
                 multiply_item = magnitude * sort_r
             
             plt.figure()
-            plt.scatter(sort_r, multiply_item, s=1)
-            plt.title(f'h={h}')
-            plt.plot(sort_r, multiply_item, marker='o')
+            plt.title(f"h={h}")
+            plt.plot(sort_r, multiply_item, marker='o', linestyle='-', markersize=4)
             plt.axhline(0, color='grey', linewidth=1)
             #plt.ylim(-0.18, 0.1)
+            plt.xlim(0, 10)
             plt.xlabel('r')
-            plt.ylabel('Average of J(r)*r') 
+            plt.ylabel('J(r)') 
             #plt.figtext(0.5, 0.95, f"h={h:.2f} {way}", ha="center", va="top", fontsize=10, color="blue")
-            plt.savefig(f'/content/current_J(r)_r_{h}.png')
+            #plt.savefig(f'/content/current_J(r)_r_{h}.png')
             plt.show()
             plt.close()
     #draw_h_fixed('J(r)')
@@ -720,11 +733,12 @@ def current_Jr(name, category):
 import h5py
 
 class DataStorage:
-    def __init__(self, position_file='position_data.h5', energy_file='energy_data.h5', current_file='current_data.h5',
+    def __init__(self, file_path, position_file='position_data.h5', energy_file='energy_data.h5', current_file='current_data.h5',
                  num_edges=2, num_h=150, num_energies=2):
-        self.position_file = position_file
-        self.energy_file = energy_file
-        self.current_file = current_file
+        self.file_path = file_path
+        self.position_file = self.file_path+position_file
+        self.energy_file = self.file_path+energy_file
+        self.current_file = self.file_path+current_file
         self.num_edges = num_edges
         self.num_h = num_h
         self.num_energies = num_energies
@@ -769,12 +783,79 @@ class DataStorage:
             current_data = current_file['currents'][:, h_index, :]
         return current_data
 
-def write_data():
+def test_triangle():
+    lat = kwant.lattice.general([(1, 0), (0.5, np.sqrt(3)/2)], name='tri', norbs=1)
+    sys = kwant.Builder()
+    A = (0, 0) 
+    B = (1, 0) 
+    C = (0, 1)
+    sys[lat(*A)] = 0
+    sys[lat(*B)] = 0
+    sys[lat(*C)] = 0
+    sys[lat(*A), lat(*B)] = 1j
+    sys[lat(*B), lat(*C)] = 1j
+    sys[lat(*C), lat(*A)] = 1j
+    
+    for i in sys.hopping_value_pairs():
+        print(i)
+    print('...')
+    for hopping in sys.hoppings():
+        print(hopping)
+    sys = sys.finalized()
+    
+    H = sys.hamiltonian_submatrix(sparse=False)
+    print(H)
+    for i, site in enumerate(sys.sites):
+        print(i, site.pos)
+    evals, evecs = eigh(H)
+    print(evals, evecs)
+    
+    for tail, head in sys.graph:
+        print(sys.sites[tail].pos, sys.sites[head].pos)
+    print(sys.graph.head(5), 'head')
+    print(sys.graph.all_edge_ids(0, 2), 'all edge ids')
+    J = kwant.operator.Current(sys)
+    psi = evecs[:, 0]
+    print('\n', psi)
+    currents = J(psi)
+    print(currents)
+    #kwant.plotter.current(sys, currents)
+    
+    print('\n test')
+    theta_a = np.angle(psi[0])
+    theta_c = np.angle(psi[1])
+    theta_ac = (theta_a - theta_c) % (2 * np.pi)
+    print(theta_ac, f'should be {2*pi/3}')
+    print('A->C', f"J gives {-currents[1]}", f"theory gives {np.sin(theta_ac+pi/2)}")
+    
+def test_current_direction():
     change_model(DEFECT, SINGLE)
-    model['L'] = model['W'] = 13
+    model['m']=0
+    model['L'] = model['W'] = 1
+    model['h'] = 1
+    sys = test_triangle()
+    J = kwant.operator.Current(sys)
+    H = sys.hamiltonian_submatrix(sparse=False)
+    # for site in sys.sites:
+    #     print(site.pos)
+    evals, evecs = eigh(H)
+    evals, evecs = custom_sort(evals, evecs, False)
+    for tail, head in sys.graph:
+        print(sys.sites[head].pos, sys.sites[tail].pos)
+    for i, val in enumerate(evals):
+        print(val, ':')
+        #print(evecs[:, i])
+        print(J(evecs[:, i]))
+    
+def write_data():
+    #change_model(DEFECT, CLUSTER)
+    #change_model(HALDANE, NONTRIVIAL)
+    change_model(DEFECT, SINGLE)
+    model['m']=0
+    L = model['L'] = model['W'] = 25
     sys = model_builder()
     H = sys.hamiltonian_submatrix(sparse=False)
-    num_h = 150
+    num_h = 400
     num_energies = np.shape(H)[0]
     
     #存位置
@@ -783,14 +864,15 @@ def write_data():
         positions_list.append([sys.sites[head].pos, sys.sites[tail].pos])
     positions = np.array(positions_list)
     num_edges = positions.shape[0]
-    storage = DataStorage(num_edges=num_edges, num_h=num_h, num_energies=num_energies)
+    storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/', 
+                          num_edges=num_edges, num_h=num_h, num_energies=num_energies)
     storage.write_positions(positions)
     
-    h_list = np.linspace(0.3, 1.8, num_h)
+    h_list = np.linspace(0.0, 2.0, num_h)
     for i, h in enumerate(h_list):
         model['h'] = h
         sys = model_builder()
-        
+         
         #存能量
         H = sys.hamiltonian_submatrix(sparse=False)
         evals, evecs = eigh(H)
@@ -809,7 +891,8 @@ def write_data():
     # print(storage.read_currents(1))
 
 def read_data():
-    def get_interactions(positions, k=0, threshold=0):
+    GAUSSIAN, STATE = "gaussian", "state"
+    def get_interactions(storage, positions, k=0, threshold1=None, threshold2=None):
         if k == 0:
             line_vector = np.array([0, 1])
         else:    
@@ -817,9 +900,13 @@ def read_data():
         interact = np.zeros(storage.num_edges)
         signs = np.zeros(storage.num_edges)
         for i, edge in enumerate(positions):
-            (x1, y1), (x2, y2) = edge
-            if np.sqrt(((x1+x2)/2)**2 + ((y1+y2)/2)**2) < threshold: #距离小的不要
-                continue
+            (x2, y2), (x1, y1) = edge
+            if threshold1 is not None:
+                if np.sqrt(((x1+x2)/2)**2 + ((y1+y2)/2)**2) < threshold1: #距离小的不要，按中点算
+                    continue
+            if threshold2 is not None:
+                if np.sqrt(((x1+x2)/2)**2 + ((y1+y2)/2)**2) > threshold2: #距离大的不要，按中点算
+                    continue
             if (x1<0 and y1<0) or (x2<0 and y2<0): #不在第一象限的不要（一条边的例外）
                 continue
             head_in_first_quadrant = (x1 >= 0) and (y1 >= 0)
@@ -835,45 +922,241 @@ def read_data():
                 signs[i] = np.sign(interact[i])
         return interact, signs
     
-    def get_sumcurrents():
+    def get_sumcurrents(storage, tag, *args):
         sum_currents = np.zeros((storage.num_h, storage.num_edges))
-        for h_i in range(storage.num_h):
-            energies = storage.read_energies(h_i)
-            gaussian_values = np.exp(-energies**2 / (2 * sigma**2))
-            gaussian_values /= np.max(gaussian_values)
-            gaussian_values[energies>=0] = 0
-            currents = storage.read_currents(h_i)
-            sum_currents[h_i] = np.array([np.dot(currents[j], gaussian_values) for j in range(storage.num_edges)])
+        if tag == GAUSSIAN:
+            sigma = args[0]
+            for h_i in range(storage.num_h):
+                energies = storage.read_energies(h_i)
+                negative_energies = energies[energies < 0]
+                #center = negative_energies[np.argmin(np.abs(negative_energies))]
+                gaussian_values = np.exp(-(energies-0)**2 / (2 * sigma**2))
+                gaussian_values /= np.max(gaussian_values)
+                gaussian_values[energies<=0] = 0
+                
+                currents = storage.read_currents(h_i)
+                sum_currents[h_i] = np.array([np.dot(currents[j], gaussian_values) for j in range(storage.num_edges)])
+        elif tag == STATE:
+            state_index = args[0]
+            cutoff = args[1]
+            for h_i in range(storage.num_h):
+                energies = storage.read_energies(h_i)
+                negative_indices = np.where(energies < 0)[0]
+                negative_energies = energies[negative_indices]
+                sorted_indices = np.argsort(np.abs(negative_energies))[:]
+                mask = np.zeros_like(energies, dtype=int)
+                if state_index < len(sorted_indices):
+                    if abs(negative_energies[sorted_indices[state_index]]) <= cutoff:
+                        mask[negative_indices[sorted_indices[state_index]]] = 1
+                currents = storage.read_currents(h_i)
+                sum_currents[h_i] = np.array([np.dot(currents[j], mask) for j in range(storage.num_edges)])
+                
         return sum_currents
-        
-    sigma = 1/13
-    storage = DataStorage()
-    storage.num_h = 150
-    positions = storage.read_positions()
-    h_list = np.linspace(0.3, 1.8, storage.num_h)
-    sum_currents = get_sumcurrents()
     
-    plt.figure()
-    plt.axhline(0, color='gray', linestyle='-', linewidth=1)
-    for l in [0,1,2,3,4,5,6]:
-        for r in [0.6]:
-            interactions, signs = get_interactions(positions, k=l, threshold=r)
-            flow_list = np.dot(sum_currents, interactions)
-            i = np.where(flow_list < 0)[0][-1]
-            plt.plot(h_list, flow_list, label=f'interact k={l:.3f} r={r:.3f} zero={h_list[i]:.3f}')
-            # flow_list = np.dot(sum_currents, signs)
-            # i = np.where(flow_list < 0)[0][-1]
-            # plt.plot(h_list, flow_list, label=f'signs k={l:.3f} r={r:.3f} zero={(h_list[i]+h_list[i+1])/2:.3f}')
-            # #test
-            # nonzero_indices = np.nonzero(signs)[0]
-            # for i in nonzero_indices:
-            #     print(l, f'edge={positions[i]}')
-            #     print(f'signs={signs[i]}')
-            #     print(f'h=0.3 sum_currents={sum_currents[0, i]}')
-            #     print('\n')
+    def hc_plot():
+        global_hc = np.array([
+    [0.90954774, 0.93969849, 0.89949749, 0.89949749, 0.92964824],
+    [0.93969849, 0.88944724, 0.90954774, 0.89949749, 0.90954774],
+    [0.92964824, 0.89949749, 0.87939698, 0.88944724, 0.89949749],
+    [0.90954774, 0.91959799, 0.89949749, 0.88944724, 0.89949749],
+    [0.92964824, 0.89949749, 0.90954774, 0.89949749, 0.89949749],
+    [0.91959799, 0.90954774, 0.88944724, 0.89949749, 0.89949749]
+])
+        x_labels = ['9', '13', '17', '21', '25', '29']
+        for i in range(global_hc.shape[1]):
+            plt.plot(range(len(x_labels)), global_hc[:, i], marker='o', linewidth=2, label=f"a={a_list[i]}")
+        plt.xticks(ticks=range(len(x_labels)), labels=x_labels)
+        plt.xlabel("system size", fontsize=12)
+        plt.ylabel("hc", fontsize=12)
+        plt.ylim(0.5, 1)
+        plt.legend(title="Legend", fontsize=10)
+        plt.grid(alpha=0.5)
+        plt.tight_layout()
+        plt.show()
         
-    plt.legend()
-    plt.show()
+    def all_plot():
+        L_list = [9]#[9, 13, 17, 21, 25, 29]
+        a_list = [0.1, 0.5, 1, 2, 4]
+        for iL, L in enumerate(L_list):
+            storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/')
+            storage.num_h = 400
+            positions = storage.read_positions()
+            h_list = np.linspace(0.0, 2.0, storage.num_h)
+            plt.figure()
+            plt.axhline(0, color='gray', linestyle='-', linewidth=1, alpha=0.4)
+            _, signs = get_interactions(storage, positions, k=0, threshold1=None, threshold2=None)
+            
+            for ia, a in enumerate(a_list):
+                sum_currents = get_sumcurrents(storage, GAUSSIAN, a/L)
+                flow_list = np.dot(sum_currents, signs)
+                crossing_index = np.where(flow_list > 0)[0][-1]
+                if crossing_index == storage.num_h - 1:
+                    zero = 0
+                else:
+                    zero=(h_list[crossing_index]+h_list[crossing_index+1])/2
+                plt.plot(h_list, flow_list, label=f'a={a:.2f} ZC={zero:.2f}')
+                #global_hc[iL][ia]=zero
+            plt.title(f"L={L}")
+            plt.xlabel('h')
+            plt.ylabel('current flow')
+            plt.legend()
+            plt.tight_layout()
+            #plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/diff_sigma/all/{L}.png")
+            plt.show()
+            plt.close()
+    
+    def cancel_out_plot():
+        L_list = [9, 13, 17, 21, 25, 29]
+        a = 1
+        for iL, L in enumerate(L_list):
+            storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/')
+            storage.num_h = 400
+            positions = storage.read_positions()
+            h_list = np.linspace(0.0, 2.0, storage.num_h)
+            
+            various_set = [[[None, 0.4, 'green', 'inner NNN'],[0.4, 0.6,'dodgerblue', 'inner NN'],[None, 0.6, 'crimson','inner']],
+                    [[None, 0.6, 'crimson', 'inner'],[0.6, None, 'mediumpurple', 'outer'],[None, None, 'orange', 'total']]] #第一组star hex in 第二组in out total
+            my_linestyle={"0":"-", "10":":"}
+            folder_name = ['star_hex_in', 'in_out_all']
+            for ig, group in enumerate(various_set):
+                plt.figure()
+                plt.axhline(0, color='gray', linestyle='-', linewidth=1, alpha=0.4)
+                for area in group:
+                    for k in [0, 10]:
+                        _, signs = get_interactions(storage, positions, k=k, threshold1=area[0], threshold2=area[1])
+                        sum_currents = get_sumcurrents(storage, GAUSSIAN, a/L)
+                        flow_list = np.dot(sum_currents, signs)
+                        plt.plot(h_list, flow_list, linestyle=my_linestyle[f"{k}"], color=area[2])
+                
+                plt.title(f"L={L} a={a}")
+                plt.xlabel('h')
+                plt.ylabel('current flow')
+                custom_legend = [
+                    Line2D([0], [0], color=group[0][2], lw=2, label=group[0][3]),
+                    Line2D([0], [0], color=group[1][2], lw=2, label=group[1][3]),
+                    Line2D([0], [0], color=group[2][2], lw=2, label=group[2][3])
+                ]
+                plt.legend(handles=custom_legend, loc='lower right')
+                plt.tight_layout()
+                #plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/diff_sigma/{folder_name[ig]}/{L}.png")
+                plt.show()
+                plt.close()
+
+    def states_plot():
+        L_list = [9]#[9, 13, 17, 21, 25, 29]
+        for iL, L in enumerate(L_list):
+            storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/')
+            storage.num_h = 400
+            positions = storage.read_positions()
+            h_list = np.linspace(0.0, 2.0, storage.num_h)
+            plt.figure()
+            plt.axhline(0, color='gray', linestyle='-', linewidth=1, alpha=0.4)
+            _, signs = get_interactions(storage, positions, k=0, threshold1=None, threshold2=None)
+            
+            state_indices = np.arange(0, 11)
+            for state_index in state_indices:
+                sum_currents = get_sumcurrents(storage, STATE, state_index, 0.1)
+                flow_list = np.dot(sum_currents, signs)
+                if not np.all(flow_list == 0):
+                    plt.scatter(h_list, flow_list, label=f'{state_index}', s=1.5)
+            plt.title(f"L={L}")
+            plt.xlabel('h')
+            #plt.xlim(0.3, 1.8)
+            #plt.ylim(-0.01, 0.01)
+            plt.ylabel('current flow')
+            plt.legend()
+            plt.tight_layout()
+            #plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/states/{L}.png")
+            plt.show()
+            plt.close()
+
+    #all_plot()
+    #cancel_out_plot()
+    #states_plot()
+
+def middle_hex():
+    def if_same_pos(pos1, pos2):
+        return np.allclose(pos1[0], pos2[0], atol=tolerance) and np.allclose(pos1[1], pos2[1], atol=tolerance)
+    
+    def phase_info(eigenstate):
+        theta_a = np.angle(eigenstate[hex_index[0]])
+        theta_b = np.angle(eigenstate[hex_index[1]])
+        theta_c = np.angle(eigenstate[hex_index[2]])
+        theta_ab = (theta_a - theta_b) % (2 * np.pi)
+        theta_bc = (theta_b - theta_c) % (2 * np.pi)
+        return theta_ab, theta_bc
+    
+    def current_info(current):
+        current_ba = current[current_index[0]]
+        current_ca = current[current_index[1]]
+        return current_ba, current_ca
+    
+    change_model(DEFECT, SINGLE)
+    L=model['L']=model['W']=25
+    tmp_sys = model_builder()
+    tolerance=0.1
+    hex_pos = [[0.5, -0.5/sqrt(3)], [0.5, 0.5/sqrt(3)], [0, 1/sqrt(3)], [-0.5, 0.5/sqrt(3)], [-0.5, -0.5/sqrt(3)], [0, -1/sqrt(3)]]
+    hex_index = np.zeros(6, dtype=int)
+    current_pos = [[1, 0], [2, 0], [2, 1], [3, 1]]
+    current_index = np.zeros(4, dtype=int)
+    for i, site in enumerate(tmp_sys.sites):
+        for which_pos, pos in enumerate(hex_pos):
+            if if_same_pos(site.pos, pos):
+                hex_index[which_pos]=i
+    for i, (tail, head) in enumerate(tmp_sys.graph):
+        for which_current, pos in enumerate(current_pos):
+            if if_same_pos(tmp_sys.sites[head].pos, hex_pos[pos[1]]) and if_same_pos(tmp_sys.sites[tail].pos, hex_pos[pos[0]]):
+                current_index[which_current]=i
+    #print(hex_index)
+    #print(current_index)
+    
+    
+    for h in [0.5, 0.75, 0.85, 1, 1.5]:
+        model['h'] = h
+        sys = model_builder()
+        J = kwant.operator.Current(sys)
+        H = sys.hamiltonian_submatrix(sparse=False)
+        evals, evecs = eigh(H)
+        condition = (evals < 0) & (np.abs(evals) < 1)
+        selected_indices = np.where(condition)[0]
+        selected_evals = evals[selected_indices]
+        selected_evecs = evecs[:, selected_indices]
+        sorted_order = np.argsort(np.abs(selected_evals))
+        sorted_evals = selected_evals[sorted_order]
+        sorted_evecs = selected_evecs[:, sorted_order]
+        currents = np.array([J(sorted_evecs[:, i]) for i in range(len(sorted_evals))])
+
+        y_values = np.array([phase_info(sorted_evecs[:, i]) for i in range(len(sorted_evals))])
+        x_axis = sorted_evals
+        plt.scatter(x_axis, y_values[:, 0], color='blue', alpha=0.7, edgecolors='w', s=100, label='A-B')
+        plt.scatter(x_axis, y_values[:, 1], color='orange', alpha=0.7, edgecolors='w', s=100, label='B-C')
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=2, frameon=False)
+        plt.xlabel('Energy', fontsize=14)
+        plt.ylabel('phase diff', fontsize=14)
+        plt.ylim(0, 2 * np.pi)
+        plt.xticks(fontsize=12)
+        interval = np.pi/3
+        plt.yticks([i * interval for i in range(7)], ['0', 'π/3', '2π/3', 'π', '4π/3', '5π/3', '2π'],fontsize=12)
+        plt.grid(True, linestyle='--', alpha=0.5)
+        #plt.show()
+        plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/middle_hex/{L}_comparison/{h}_phase.png")
+        plt.close()
+        
+        y_values = np.array([current_info(currents[i]) for i in range(len(sorted_evals))])
+        x_axis = sorted_evals
+        plt.axhline(0, color='gray', linestyle='-', linewidth=1, alpha=0.4)
+        plt.scatter(x_axis, y_values[:, 0], color='blue', alpha=0.7, edgecolors='w', s=100, label='A->B (NN)')
+        plt.scatter(x_axis, y_values[:, 1], color='orange', alpha=0.7, edgecolors='w', s=100, label='A->C (NNN)')
+        plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=2, frameon=False)
+        plt.xlabel('Energy', fontsize=14)
+        plt.ylabel('current', fontsize=14)
+        #plt.ylim(-0.03, 0.05)
+        plt.xticks(fontsize=12)
+        plt.grid(True, linestyle='--', alpha=0.5)
+        #plt.show()
+        plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/middle_hex/{L}_comparison/{h}_current.png")
+        plt.close()
+        
 
 def current_kwant(sys, num_states = 20, max_E = 0.5):
     H = sys.hamiltonian_submatrix(sparse=False)
@@ -916,7 +1199,7 @@ def current_direction(name, category, max_E = 0.1):
     change_model(name, category)
     temp_sys = model_builder()
     pos_info = []
-    for head, tail in temp_sys.graph:
+    for tail, head in temp_sys.graph:
         p1, p2 = temp_sys.sites[head].pos, temp_sys.sites[tail].pos
         # unit_vector = (p2-p1)/np.linalg.norm(p2-p1)
         pos_info.append([p1, p2])
@@ -1122,7 +1405,8 @@ def haldane():
         sys[kwant.builder.HoppingKind(neighbor, a, a)] = temp.conjugate()
 
     #kwant.plot(sys)
-
+    # sys 是 kwant.Builder 对象
+    
     # 2D PEC exception: currently useless
     if L == 0 and W == 0:
         return kwant.wraparound.wraparound(sys).finalized()
@@ -2046,7 +2330,18 @@ def draw_u():
 #draw_u()
 
 #write_data()
-read_data()   
+#read_data()
+#test_triangle()
+middle_hex()
+# change_model(DEFECT, SINGLE)
+# model['L']=model['W']=1
+# model_builder()
+
+#test_current_direction()
+#current_Jr(DEFECT, SINGLE)
+# change_model(HALDANE, NONTRIVIAL)
+# model['L']=model['W']=21
+# model_builder()
 
 # change_model(DEFECT, SINGLE)
 # change_para(GAP)
