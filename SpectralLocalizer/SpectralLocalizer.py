@@ -6,7 +6,9 @@ from numpy.linalg import eigh
 from scipy.linalg import kron
 # import pylab as py
 import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, AutoMinorLocator)
+import matplotlib.colors as mcolors
+import matplotlib.image as mpimg
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import sys as system
 import cmath
 from math import sqrt, pi, sin, cos, dist
@@ -120,17 +122,38 @@ def defect_graphene():
                     sys[a(tar[0], tar[1]), a(sour[0], sour[1])] = temp
     else:
         system.exit()
+    
+    def draw_schematic():
+        def color_sites(site):
+            if 'a' in site.family.name or 'b' in site.family.name:
+                return mcolors.to_rgba("darkblue", alpha=0.8)
+        def color_hoppings(tar, sour):
+            if sour.family != tar.family:  
+                return 'cornflowerblue' 
+            else:
+                return 'black'
         
-    # for i in sys.hopping_value_pairs():
-    #     print(i)
+        fig, ax = plt.subplots()
+        kwant.plot(sys, ax=ax,site_color=color_sites,site_size=0.08,hop_color=color_hoppings,hop_lw=0.05)
+        ax.set_aspect('equal', 'box')
+        ax.plot([0, 2.6], [0, 0], color='crimson', linewidth=2, linestyle='--')
+        hex_pos = np.array([[0.5, -0.5/sqrt(3)], [0.5, 0.5/sqrt(3)], [0, 1/sqrt(3)], [-0.5, 0.5/sqrt(3)], [-0.5, -0.5/sqrt(3)], [0, -1/sqrt(3)]])
+        arrow_pos, arrow_k, x_k = [], [], [-1,-1,2,-2,1,1]
+        for i in [0, 2, 4, 1, 3, 5]:
+            j = (i+2)%6
+            arrow_pos.append((hex_pos[i]+hex_pos[j])/2)
+            arrow_k.append((hex_pos[j][1]-hex_pos[i][1])/(hex_pos[j][0]-hex_pos[i][0]))
+        epsilon, ratio = 0.1, 0.5
+        for i in range(6):
+            x, y, delta_x = arrow_pos[i][0], arrow_pos[i][1], epsilon*x_k[i]
+            ax.annotate('', xy=(x+ratio*delta_x, y+ratio*delta_x*arrow_k[i]), xytext=(x-(1-ratio)*delta_x, y-(1-ratio)*delta_x*arrow_k[i]),
+                        arrowprops=dict(arrowstyle='-|>', color='black', lw=0.1,mutation_scale=16))
+
+        plt.tight_layout()
+        plt.savefig(f"/Users/ruiqixu/Desktop/model.png",dpi=fig.dpi, bbox_inches='tight')
+        #plt.show()
     
-    # fig, ax = plt.subplots()
-    # kwant.plot(sys, ax=ax)
-    # ax.set_aspect('equal', 'box')
-    # ax.plot([0, 6.6], [0, 0], color='grey', linewidth=2, linestyle='--')
-    # plt.tight_layout()
-    # plt.show()
-    
+    #draw_schematic()
     #kwant.plot(sys)
     
     return sys.finalized()
@@ -387,12 +410,12 @@ def current_Jr(name, category):
     #draw_current()
     
     def draw_h_fixed(whichsum):
-        # 记得换sigma
         h_list = [0.7, 1.3]
-        for h in h_list:
+        colors = ['forestgreen', 'brown']
+        plt.figure()
+        for i, h in enumerate(h_list):
             model['h'] = h
             sys = model_builder()
-            label = pick_label(model['name'])
             evals, current = pure_current_info(sys)
             way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 2/model['L'])
             magnitude, _, _, _ = magnitude_info(sum_current)
@@ -400,20 +423,24 @@ def current_Jr(name, category):
                 multiply_item=magnitude
             elif whichsum == 'J(r)_r':
                 multiply_item = magnitude * sort_r
-            
-            plt.figure()
-            plt.title(f"h={h}")
-            plt.plot(sort_r, multiply_item, marker='o', linestyle='-', markersize=4)
-            plt.axhline(0, color='grey', linewidth=1)
-            #plt.ylim(-0.18, 0.1)
-            plt.xlim(0, 10)
-            plt.xlabel('r')
-            plt.ylabel('J(r)') 
-            #plt.figtext(0.5, 0.95, f"h={h:.2f} {way}", ha="center", va="top", fontsize=10, color="blue")
-            #plt.savefig(f'/content/current_J(r)_r_{h}.png')
-            plt.show()
-            plt.close()
-    #draw_h_fixed('J(r)')
+            plt.plot(sort_r, multiply_item, marker='o', linestyle='-', markersize=4, label=f"h={h}", color=colors[i], alpha=0.95)
+        plt.axhline(0, color='grey', linewidth=1)
+        plt.xlim(0, 6)
+        plt.xlabel('r')
+        plt.ylabel('J(r)') 
+        plt.legend(loc='lower right')
+        ax = plt.gca()
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        
+        ax_inset = inset_axes(ax, width="55%", height="55%", loc="upper right")
+        image = mpimg.imread("/Users/ruiqixu/Desktop/tmp/current_new/update/r.png")
+        ax_inset.imshow(image)
+        ax_inset.axis("off")
+        plt.savefig(f"/Users/ruiqixu/Desktop/J(r).png",dpi=300, bbox_inches='tight')
+        #plt.show()
+        plt.close()
+    draw_h_fixed('J(r)')
     #draw_h_fixed('J(r)_r')
 
     def draw_r_fixed(r):
@@ -953,39 +980,43 @@ def read_data():
                 
         return sum_currents
     
-    def hc_plot():
-        global_hc = np.array([
-    [0.90954774, 0.93969849, 0.89949749, 0.89949749, 0.92964824],
-    [0.93969849, 0.88944724, 0.90954774, 0.89949749, 0.90954774],
-    [0.92964824, 0.89949749, 0.87939698, 0.88944724, 0.89949749],
-    [0.90954774, 0.91959799, 0.89949749, 0.88944724, 0.89949749],
-    [0.92964824, 0.89949749, 0.90954774, 0.89949749, 0.89949749],
-    [0.91959799, 0.90954774, 0.88944724, 0.89949749, 0.89949749]
-])
-        x_labels = ['9', '13', '17', '21', '25', '29']
-        for i in range(global_hc.shape[1]):
-            plt.plot(range(len(x_labels)), global_hc[:, i], marker='o', linewidth=2, label=f"a={a_list[i]}")
-        plt.xticks(ticks=range(len(x_labels)), labels=x_labels)
-        plt.xlabel("system size", fontsize=12)
-        plt.ylabel("hc", fontsize=12)
-        plt.ylim(0.5, 1)
-        plt.legend(title="Legend", fontsize=10)
-        plt.grid(alpha=0.5)
-        plt.tight_layout()
-        plt.show()
+    def hc_plot_exist(ax):
+        cmap = plt.get_cmap('viridis')
+        colors = [cmap(i) for i in np.linspace(0, 1, 5)]
+        global_hc = np.array([[0.90977444, 0.94486216, 0.9047619,  0.89974937, 0.92982456],
+                              [0.93483709, 0.88972431, 0.91478697, 0.89974937, 0.90977444],
+                              [0.92982456, 0.89974937, 0.87969925, 0.89473684, 0.9047619 ],
+                              [0.90977444, 0.92481203, 0.9047619,  0.89473684, 0.89974937],
+                              [0.92982456, 0.89974937, 0.90977444, 0.89974937, 0.89974937],
+                              [0.91959799, 0.90954774, 0.88944724, 0.89949749, 0.89949749]])
+        L_list = np.array([9, 13, 17, 21, 25, 29], dtype=float)
+        a_list = [0.1, 0.5, 1, 2, 4]
+        for iL, L in enumerate(L_list):
+            for ia, a in enumerate(a_list):
+                ax.plot(L_list, global_hc[:, ia], marker='o', linewidth=1, linestyle=':', ms=2.5, color=colors[ia], alpha=0.7)
+        ax.set_xticks(ticks=L_list)
+        ax.set_xlabel("L")
+        ax.set_ylabel(r'$\text{h}_{\text{c}}$')
+        ax.set_ylim(0.8, 1)
+        ax.set_yticks([0.8, 0.85, 0.9, 0.95, 1])
+        ax.grid(alpha=0.5)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
         
-    def all_plot():
-        L_list = [9]#[9, 13, 17, 21, 25, 29]
+    def hc_plot(ax):
+        cmap = plt.get_cmap('viridis')
+        colors = [cmap(i) for i in np.linspace(0, 1, 5)]
+        global_hc = np.zeros((6, 5), dtype=float)
+        L_list = [9, 13, 17, 21, 25, 29]
         a_list = [0.1, 0.5, 1, 2, 4]
         for iL, L in enumerate(L_list):
             storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/')
             storage.num_h = 400
+            if L == 29:
+                storage.num_h = 200
             positions = storage.read_positions()
             h_list = np.linspace(0.0, 2.0, storage.num_h)
-            plt.figure()
-            plt.axhline(0, color='gray', linestyle='-', linewidth=1, alpha=0.4)
             _, signs = get_interactions(storage, positions, k=0, threshold1=None, threshold2=None)
-            
             for ia, a in enumerate(a_list):
                 sum_currents = get_sumcurrents(storage, GAUSSIAN, a/L)
                 flow_list = np.dot(sum_currents, signs)
@@ -994,15 +1025,49 @@ def read_data():
                     zero = 0
                 else:
                     zero=(h_list[crossing_index]+h_list[crossing_index+1])/2
-                plt.plot(h_list, flow_list, label=f'a={a:.2f} ZC={zero:.2f}')
-                #global_hc[iL][ia]=zero
-            plt.title(f"L={L}")
-            plt.xlabel('h')
-            plt.ylabel('current flow')
-            plt.legend()
-            plt.tight_layout()
-            #plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/diff_sigma/all/{L}.png")
-            plt.show()
+                global_hc[iL, ia] = zero
+
+        for ia, a in enumerate(a_list):
+            ax.plot(L_list, global_hc[:, ia], marker='o', linewidth=1, ms=3.5, color=colors[ia], alpha=0.8)
+        ax.set_xticks(ticks=L_list)
+        ax.set_xlabel("L", fontsize=8)
+        ax.set_ylabel(r'$\text{h}_{\text{c}}$', fontsize=8)
+        ax.set_ylim(0.7, 1)
+        ax.grid(alpha=0.5)
+        ax.spines['top'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        
+    def all_plot():
+        L_list = [25]
+        a_list = [0.1, 0.5, 1, 2, 4]
+        cmap = plt.get_cmap('viridis')
+        colors = [cmap(i) for i in np.linspace(0, 1, 5)]
+        for iL, L in enumerate(L_list):
+            storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/')
+            storage.num_h = 400
+            positions = storage.read_positions()
+            h_list = np.linspace(0.0, 2.0, storage.num_h)
+            fig, ax = plt.subplots()
+            ax.axhline(0, color='gray', linestyle='-', linewidth=1, alpha=0.4)
+            _, signs = get_interactions(storage, positions, k=0, threshold1=None, threshold2=None)
+            
+            for ia, a in enumerate(a_list):
+                sum_currents = get_sumcurrents(storage, GAUSSIAN, a/L)
+                flow_list = np.dot(sum_currents, signs)
+                ax.plot(h_list, flow_list, label=f'a={a:.1f}', color=colors[ia], linewidth=1.5, alpha = 0.7)
+            ax.set_title(f"L={L}", loc='left')
+            ax.set_xlabel('h')
+            ax.set_ylabel(r'$\text{I}_{\text{circ}}$')
+            ax.legend(loc='lower left')
+            ax.spines['top'].set_visible(False)
+            ax.spines['right'].set_visible(False)
+            
+            ax_inset = inset_axes(ax, width="45%", height='35%', loc="upper right")
+            hc_plot_exist(ax_inset)
+            ax_inset.tick_params(axis='both', labelsize=8)
+            
+            plt.savefig(f"/Users/ruiqixu/Desktop/{L}_1.png",dpi=fig.dpi, bbox_inches='tight')
+            #plt.show()
             plt.close()
     
     def cancel_out_plot():
@@ -1070,10 +1135,48 @@ def read_data():
             plt.show()
             plt.close()
 
-    #all_plot()
+    all_plot()
     #cancel_out_plot()
     #states_plot()
 
+import sympy as sp
+def one_hex_model():
+    h = sp.symbols('h',real=True,nonnegative=True)
+    #E C A D F B
+    H = sp.Matrix([[0, h*sp.I, -h*sp.I, -1, -1, 0], [ -h*sp.I, 0, h*sp.I, -1, 0, -1], [h*sp.I, -h*sp.I, 0, 0, -1, -1],
+                   [-1, -1, 0, 0, -h*sp.I, h*sp.I], [-1, 0, -1, h*sp.I, 0, -h*sp.I], [0, -1, -1, -h*sp.I, h*sp.I, 0]])
+    eigenvalues = H.eigenvals()
+    eigenvectors = H.eigenvects()
+    print(eigenvectors)
+    num_h=200
+    h_list = np.linspace(0.0, 2.0, num_h)
+    
+    fig, ax = plt.subplots()
+    interval = pi / 3
+    positive_ticks = [i * interval for i in range(7)]
+    positive_labels = ['0', 'π/3', '2π/3', 'π', '4π/3', '5π/3', '2π']
+    if ax.get_ylim()[1] > 0:
+        ax.set_yticks(positive_ticks)
+        ax.set_yticklabels(positive_labels, fontsize=12)
+    
+    for i in range(6):
+        energy_list = np.array([eigenvectors[i][0].subs(h, h_val) for h_val in h_list])
+        mask = energy_list<=0
+        if not np.any(mask):
+            continue
+        line, = ax.plot(h_list[mask], energy_list[mask], label=r'$'+sp.latex(eigenvectors[i][0])+r'$')
+        phase_list = np.zeros(200)
+        for j, h_val in enumerate(h_list):
+            phase_A=sp.arg(eigenvectors[i][2][0][2].subs(h, h_val))
+            phase_B=sp.arg(eigenvectors[i][2][0][5].subs(h, h_val))
+            phase_list[j] = (phase_A-phase_B)%(2*pi)
+        ax.plot(h_list[mask], phase_list[mask], color=line.get_color())
+    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+    ax.set_xlabel('h')
+    plt.tight_layout()
+    plt.show()
+    plt.close()
+    
 def middle_hex():
     def if_same_pos(pos1, pos2):
         return np.allclose(pos1[0], pos2[0], atol=tolerance) and np.allclose(pos1[1], pos2[1], atol=tolerance)
@@ -1109,7 +1212,6 @@ def middle_hex():
                 current_index[which_current]=i
     #print(hex_index)
     #print(current_index)
-    
     
     for h in [0.5, 0.75, 0.85, 1, 1.5]:
         model['h'] = h
@@ -1156,7 +1258,6 @@ def middle_hex():
         #plt.show()
         plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/middle_hex/{L}_comparison/{h}_current.png")
         plt.close()
-        
 
 def current_kwant(sys, num_states = 20, max_E = 0.5):
     H = sys.hamiltonian_submatrix(sparse=False)
@@ -2331,14 +2432,17 @@ def draw_u():
 
 #write_data()
 #read_data()
+
 #test_triangle()
-middle_hex()
+#middle_hex()
+#one_hex_model()
+
 # change_model(DEFECT, SINGLE)
-# model['L']=model['W']=1
+# model['L']=model['W']=5
 # model_builder()
 
-#test_current_direction()
 #current_Jr(DEFECT, SINGLE)
+
 # change_model(HALDANE, NONTRIVIAL)
 # model['L']=model['W']=21
 # model_builder()
