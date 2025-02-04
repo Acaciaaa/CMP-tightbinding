@@ -1071,7 +1071,7 @@ def read_data():
             plt.close()
     
     def cancel_out_plot():
-        L_list = [9, 13, 17, 21, 25, 29]
+        L_list = [25]#[9, 13, 17, 21, 25, 29]
         a = 1
         for iL, L in enumerate(L_list):
             storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/')
@@ -1093,18 +1093,21 @@ def read_data():
                         flow_list = np.dot(sum_currents, signs)
                         plt.plot(h_list, flow_list, linestyle=my_linestyle[f"{k}"], color=area[2])
                 
-                plt.title(f"L={L} a={a}")
+                plt.title(f"L={L} a={a}", loc='left')
                 plt.xlabel('h')
-                plt.ylabel('current flow')
+                plt.ylabel(r'$\text{I}_\text{circ}$')
                 custom_legend = [
                     Line2D([0], [0], color=group[0][2], lw=2, label=group[0][3]),
                     Line2D([0], [0], color=group[1][2], lw=2, label=group[1][3]),
                     Line2D([0], [0], color=group[2][2], lw=2, label=group[2][3])
                 ]
                 plt.legend(handles=custom_legend, loc='lower right')
+                ax = plt.gca()
+                ax.spines['top'].set_visible(False)
+                ax.spines['right'].set_visible(False)
                 plt.tight_layout()
-                #plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/diff_sigma/{folder_name[ig]}/{L}.png")
-                plt.show()
+                plt.savefig(f"/Users/ruiqixu/Desktop/{ig}.png",dpi=300, bbox_inches='tight')
+                #plt.show()
                 plt.close()
 
     def states_plot():
@@ -1131,50 +1134,47 @@ def read_data():
             plt.ylabel('current flow')
             plt.legend()
             plt.tight_layout()
-            #plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/states/{L}.png")
-            plt.show()
+            plt.savefig(f"/Users/ruiqixu/Desktop/{L}.png",dpi=300, bbox_inches='tight')
+            #plt.show()
             plt.close()
 
-    all_plot()
-    #cancel_out_plot()
+    #all_plot()
+    cancel_out_plot()
     #states_plot()
 
 import sympy as sp
 def one_hex_model():
+    cmap = plt.get_cmap('viridis')
+    colors = [cmap(i) for i in np.linspace(0, 1, 6)]
     h = sp.symbols('h',real=True,nonnegative=True)
-    #E C A D F B
+    #order: E C A D F B
     H = sp.Matrix([[0, h*sp.I, -h*sp.I, -1, -1, 0], [ -h*sp.I, 0, h*sp.I, -1, 0, -1], [h*sp.I, -h*sp.I, 0, 0, -1, -1],
                    [-1, -1, 0, 0, -h*sp.I, h*sp.I], [-1, 0, -1, h*sp.I, 0, -h*sp.I], [0, -1, -1, -h*sp.I, h*sp.I, 0]])
-    eigenvalues = H.eigenvals()
     eigenvectors = H.eigenvects()
-    print(eigenvectors)
+    #print(eigenvectors)
     num_h=200
     h_list = np.linspace(0.0, 2.0, num_h)
     
     fig, ax = plt.subplots()
-    interval = pi / 3
-    positive_ticks = [i * interval for i in range(7)]
-    positive_labels = ['0', 'π/3', '2π/3', 'π', '4π/3', '5π/3', '2π']
-    if ax.get_ylim()[1] > 0:
-        ax.set_yticks(positive_ticks)
-        ax.set_yticklabels(positive_labels, fontsize=12)
-    
+    thetas = ['0', 'π', 'π/3', '4π/3', '5π/3', '2π/3']
     for i in range(6):
         energy_list = np.array([eigenvectors[i][0].subs(h, h_val) for h_val in h_list])
-        mask = energy_list<=0
-        if not np.any(mask):
-            continue
-        line, = ax.plot(h_list[mask], energy_list[mask], label=r'$'+sp.latex(eigenvectors[i][0])+r'$')
-        phase_list = np.zeros(200)
-        for j, h_val in enumerate(h_list):
-            phase_A=sp.arg(eigenvectors[i][2][0][2].subs(h, h_val))
-            phase_B=sp.arg(eigenvectors[i][2][0][5].subs(h, h_val))
-            phase_list[j] = (phase_A-phase_B)%(2*pi)
-        ax.plot(h_list[mask], phase_list[mask], color=line.get_color())
-    ax.legend(loc='upper left', bbox_to_anchor=(1, 1))
+        line, = ax.plot(h_list, energy_list, label=r'$'+sp.latex(eigenvectors[i][0])+r'$'+', '+f"{thetas[i]}", color=colors[i])
+        # phase_list = np.zeros(200)
+        # for j, h_val in enumerate(h_list):
+        #     phase_A=sp.arg(eigenvectors[i][2][0][2].subs(h, h_val))
+        #     phase_B=sp.arg(eigenvectors[i][2][0][5].subs(h, h_val))
+        #     phase_list[j] = (phase_A-phase_B)%(2*pi)
+        # ax.plot(h_list[mask], phase_list[mask], color=line.get_color())
+    ax.legend(loc='center right', bbox_to_anchor=(1.2, 0.5))
+    ax.axhline(0, color='gray', linestyle='--', linewidth=1, alpha=0.4)
+    ax.spines['top'].set_visible(False)
+    ax.spines['right'].set_visible(False)
     ax.set_xlabel('h')
+    ax.set_ylabel('energy')
     plt.tight_layout()
-    plt.show()
+    #plt.show()
+    plt.savefig(f"/Users/ruiqixu/Desktop/toy.png",dpi=fig.dpi, bbox_inches='tight')
     plt.close()
     
 def middle_hex():
@@ -1213,13 +1213,13 @@ def middle_hex():
     #print(hex_index)
     #print(current_index)
     
-    for h in [0.5, 0.75, 0.85, 1, 1.5]:
+    for h in [0.5, 1, 1.5]:
         model['h'] = h
         sys = model_builder()
         J = kwant.operator.Current(sys)
         H = sys.hamiltonian_submatrix(sparse=False)
         evals, evecs = eigh(H)
-        condition = (evals < 0) & (np.abs(evals) < 1)
+        condition = (evals < 0) & (np.abs(evals) < 0.8)
         selected_indices = np.where(condition)[0]
         selected_evals = evals[selected_indices]
         selected_evecs = evecs[:, selected_indices]
@@ -1230,33 +1230,41 @@ def middle_hex():
 
         y_values = np.array([phase_info(sorted_evecs[:, i]) for i in range(len(sorted_evals))])
         x_axis = sorted_evals
-        plt.scatter(x_axis, y_values[:, 0], color='blue', alpha=0.7, edgecolors='w', s=100, label='A-B')
-        plt.scatter(x_axis, y_values[:, 1], color='orange', alpha=0.7, edgecolors='w', s=100, label='B-C')
+        plt.scatter(x_axis, y_values[:, 0], color='blue', alpha=0.7, edgecolors='w', s=100, label=r'$\theta_A-\theta_B$')
+        plt.scatter(x_axis, y_values[:, 1], color='orange', alpha=0.7, edgecolors='w', s=100, label=r'$\theta_B-\theta_C$')
         plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=2, frameon=False)
-        plt.xlabel('Energy', fontsize=14)
-        plt.ylabel('phase diff', fontsize=14)
-        plt.ylim(0, 2 * np.pi)
+        plt.title(f"h={h}", loc='left')
+        plt.xlabel('energy', fontsize=14)
+        #plt.xlim(-4, 0)#for L=1
+        plt.xlim(-0.82, 0.02)#for L=25
+        plt.ylabel(r'$\theta$', fontsize=14)
+        plt.ylim(-0.15, 2 * np.pi+0.15)
         plt.xticks(fontsize=12)
         interval = np.pi/3
         plt.yticks([i * interval for i in range(7)], ['0', 'π/3', '2π/3', 'π', '4π/3', '5π/3', '2π'],fontsize=12)
         plt.grid(True, linestyle='--', alpha=0.5)
         #plt.show()
-        plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/middle_hex/{L}_comparison/{h}_phase.png")
+        plt.savefig(f"/Users/ruiqixu/Desktop/{h}_phase.png",dpi=300, bbox_inches='tight')
         plt.close()
         
         y_values = np.array([current_info(currents[i]) for i in range(len(sorted_evals))])
         x_axis = sorted_evals
         plt.axhline(0, color='gray', linestyle='-', linewidth=1, alpha=0.4)
-        plt.scatter(x_axis, y_values[:, 0], color='blue', alpha=0.7, edgecolors='w', s=100, label='A->B (NN)')
-        plt.scatter(x_axis, y_values[:, 1], color='orange', alpha=0.7, edgecolors='w', s=100, label='A->C (NNN)')
+        plt.scatter(x_axis, y_values[:, 0], color='blue', alpha=0.7, edgecolors='w', s=100, label=r'$J_{B\leftarrow A}$')
+        plt.scatter(x_axis, y_values[:, 1], color='hotpink', alpha=0.7, edgecolors='w', s=100, label=r'$J_{C\leftarrow A}$')
         plt.legend(loc='upper center', bbox_to_anchor=(0.5, 1.1), ncol=2, frameon=False)
-        plt.xlabel('Energy', fontsize=14)
-        plt.ylabel('current', fontsize=14)
+        plt.title(f"h={h}", loc='left')
+        plt.xlabel('energy', fontsize=14)
+        #plt.xlim(-4, 0)#for L=1
+        plt.xlim(-0.82, 0.02)#for L=25
+        #plt.ylim(-0.32, 0.52)#for L=1
+        plt.ylim(-0.02, 0.035)#for L=25
+        plt.ylabel('J', fontsize=14)
         #plt.ylim(-0.03, 0.05)
         plt.xticks(fontsize=12)
         plt.grid(True, linestyle='--', alpha=0.5)
         #plt.show()
-        plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/middle_hex/{L}_comparison/{h}_current.png")
+        plt.savefig(f"/Users/ruiqixu/Desktop/{h}_current.png",dpi=300, bbox_inches='tight')
         plt.close()
 
 def current_kwant(sys, num_states = 20, max_E = 0.5):
@@ -2434,7 +2442,7 @@ def draw_u():
 #read_data()
 
 #test_triangle()
-#middle_hex()
+middle_hex()
 #one_hex_model()
 
 # change_model(DEFECT, SINGLE)
