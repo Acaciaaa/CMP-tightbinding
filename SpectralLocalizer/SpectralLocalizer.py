@@ -3,6 +3,7 @@ import kwant
 from scipy.sparse.linalg import eigsh, eigs
 from numpy.linalg import eigh
 from scipy.linalg import kron
+from scipy.optimize import minimize_scalar
 # import pylab as py
 import matplotlib.pyplot as plt
 import matplotlib.colors as mcolors
@@ -72,7 +73,7 @@ def eigenvalues_change(name):
     elif name == km.SSH:
         # h (t1)
         km.change_model(km.SSH, km.NONE)
-        km.model['L']=6
+        km.model['L']=9
         h_list = np.array([0.5])
         # x
         num_cc = 50
@@ -80,7 +81,7 @@ def eigenvalues_change(name):
         x_list=np.linspace(0,3,num=num_x)
         y_list=np.array([0])
         # kappa
-        kappa_list = np.array([0.5,1])
+        kappa_list = np.array([0.01,0.5,1,2,3])
         # num_eigvals
         num_eigvals = 10
     
@@ -91,7 +92,7 @@ def eigenvalues_change(name):
         plt.figure()
         plt.axhline(0, color='grey', linewidth=1, alpha=0.4)
         for line in range(num_eigvals):
-            plt.scatter(x_list, results[:, 0, 0, line],s=1)
+            plt.scatter(x_list, results[:, 0, 4, line],s=1)
         plt.show()
         plt.close()
 
@@ -101,22 +102,28 @@ def edgestate_location_1d():
     km.model['L']=9
     h_list = np.array([0.5])
     # kappa
-    num_kappa = 90
-    kappa_list = np.linspace(0, 3, num_kappa)
+    num_kappa = 50
+    kappa_list = np.linspace(0.5, 3, num_kappa)
     
     for ih, h in enumerate(h_list):
         km.model['h'] = h
         sys = km.model_builder()
         localizer = Localizer(sys)
-        
         plt.figure()
         plt.grid(True, linestyle='--', alpha=0.4)
         location_change = np.zeros(num_kappa)
+        
+        def local_chern_number(x):
+            L = localizer.get_localizer(x=x, y=0, kappa=kappa)
+            eigvals = eigsh(L, k=1, sigma=0, return_eigenvectors=False, tol=1e-5)
+            return eigvals[0]
+        
         for ikappa, kappa in enumerate(kappa_list):
-            
-            location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-5)
+            result = minimize_scalar(lambda x: abs(local_chern_number(x)), bounds=(0, 0.5), method='bounded', options={'xatol': 1e-5})
+            location_change[ikappa] = result.x
         plt.scatter(kappa_list, location_change, s=2, alpha=0.6)
         plt.ylabel('x')
+        plt.ylim(0, 0.5)
         plt.xlabel('kappa')
         plt.title(f"ssh")
         plt.savefig(f"/Users/ruiqixu/Desktop/ssh_{km.model['L']}.png", dpi=300, bbox_inches='tight')
@@ -174,5 +181,6 @@ def edgestate_location_2d():
             plt.savefig(f"/Users/ruiqixu/Desktop/{edge_name}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
             plt.close()
     
-#eigenvalues_change(km.HALDANE)
-edgestate_location_2d()
+#eigenvalues_change(km.SSH)
+#edgestate_location_2d()
+edgestate_location_1d()
