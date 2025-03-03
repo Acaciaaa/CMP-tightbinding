@@ -12,7 +12,7 @@ s0 = np.array([[1,0],[0,1]], complex)
 sx = np.array([[0,1],[1,0]], complex)
 sy = np.array([[0,-1j],[1j,0]])
 sz = np.array([[1,0],[0,-1]], complex)
-SSH, HALDANE, HALDANETRI, DEFECT, PYBINDING = 'SSH', 'haldane', 'haldane and triangular', 'defect graphene', 'pybinding'
+SSH, HALDANE, HALDANETRI, DEFECT, PYBINDING = 'SSH', 'haldane', 'haldane and triangular', 'defect', 'pybinding'
 NONTRIVIAL, TRIVIAL, NOMASS, SINGLE, CLUSTER, NONE = 'nontrivial', 'trivial', 'nomass', 'single', '7 hexagons', 'none'
 model = dict(name = NONE,  category = NONE,
          cc = 1.0, # cell-cell distance not site-site distance
@@ -48,13 +48,33 @@ def ssh():
         sys[lat(i)] = 0
 
     for i in range(2*L-1):
-        if i % 2 == 0: # A->B 弱
+        if i % 2 == 0: # A->B weak
             sys[lat(i), lat(i + 1)] = -t1
-        else: # B->A 强
+        else: # B->A strong
             sys[lat(i), lat(i + 1)] = -t2
     
+    sys = sys.finalized()
     #kwant.plot(sys)
-    return sys.finalized()
+    def draw_model():
+        fig, ax = plt.subplots()
+        kwant.plot(sys, ax=ax,site_size=0.2)
+        ax.set_xticks([]) 
+        ax.set_yticks([]) 
+        ax.set_frame_on(False)
+        ax.set_ylim(-0.5, 0.5)
+        ax.set_aspect('equal')
+        for site in sys.sites:
+            x = site.pos[0]
+            y=-0.5
+            ax.text(x, y, f'{x:.0f}', fontsize=12, ha='right', va='bottom', color='black')
+            if x%2 == 0:
+                ax.text(x, 0.2, 'A', fontsize=12, ha='right', va='bottom', color='black')
+            else:
+                ax.text(x, 0.2, 'B', fontsize=12, ha='right', va='bottom', color='black')
+        #plt.show()
+        fig.savefig(f"/Users/ruiqixu/Desktop/ssh_model.png", dpi=300, bbox_inches='tight', pad_inches=0)
+    #draw_model()
+    return sys
 
 def defect_graphene():
     cc = model['cc']
@@ -231,11 +251,7 @@ def haldane():
         sys[kwant.builder.HoppingKind(neighbor, a, a)] = temp.conjugate()
 
     #kwant.plot(sys)
-    # sys 是 kwant.Builder 对象
     
-    # 2D PEC exception: currently useless
-    if L == 0 and W == 0:
-        return kwant.wraparound.wraparound(sys).finalized()
     return sys.finalized()
 
 def change_model(name, category):
