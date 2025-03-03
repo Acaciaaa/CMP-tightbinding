@@ -119,15 +119,30 @@ class ChernMarker:
     def draw_chern_marker_2d(self, sys, macroscopic_average=None):
         if macroscopic_average is not None:
             pass
+        C = self.chern_operator(sys)
+        x_list, y_list, chern_list = np.zeros(self.dim), np.zeros(self.dim), np.zeros(self.dim)
+        for isite, site in enumerate(sys.sites):
+            x_list[isite] = site.pos[0]
+            y_list[isite] = site.pos[1]
+            chern_list[isite] = C[isite, isite]
+        plt.figure()
+        sc = plt.scatter(x_list, y_list, c=chern_list, cmap='coolwarm', vmin=-2, vmax=2, edgecolors='none')
+        plt.colorbar(sc, label="C#")
+        plt.xlabel("x")
+        plt.ylabel("y")
+        plt.title(f"{km.model['name']} h{km.model['h']} L{self.L} W{self.W}")
+        plt.show()
+        #plt.savefig(f"/Users/ruiqixu/Desktop/kappa/chern marker/{km.model['name']}/2d/{km.model['h']}.png", dpi=300, bbox_inches='tight')
     
-L = 17
-W = 17
+L = 25
+W = 25
 marker = ChernMarker(L, W)
-marker.path_1d()
+#marker.path_1d()
 #km.change_model(km.HALDANE, km.NOMASS)
 km.change_model(km.DEFECT, km.SINGLE)
 km.model['L']=L
 km.model['W']=W
-km.model['h']=0.5
+km.model['h']=1.1
 sys=km.model_builder()
-marker.draw_chern_marker_1d(sys)
+#marker.draw_chern_marker_1d(sys)
+marker.draw_chern_marker_2d(sys)
