@@ -21,18 +21,15 @@ import KwantModel as km
 def get_position_operator(sys, T, index):
     for i, site in enumerate(sys.sites):
         T[i, i] = site.pos[index]
-    
-class Localizer:
-    def __init__(self, sys):
-        H = sys.hamiltonian_submatrix(sparse=False)
-        self.H = H
-        self.dim = np.shape(H)[0]
-        self.X = np.zeros(H.shape)
-        get_position_operator(sys, self.X, 0)
-        self.Y = np.zeros(H.shape)
-        if km.model['name'] == km.HALDANE:
-            get_position_operator(sys, self.Y, 1)
+def custom_sort(evals, evecs):
+    indices = np.argsort(np.abs(evals))
+    sorted_evals = evals[indices]
+    sorted_eigens = evecs[:, indices]
+    return sorted_evals, sorted_eigens
 
+class Localizer:
+    def __init__(self, model):
+        self.H, self.X, self.Y, self.dim = model.H, model.X, model.Y, model.dim
         self.H_part = kron(km.sz, self.H)
         self.X_part = kron(km.sx, self.X)
         self.Y_part = kron(km.sy, self.Y)
@@ -42,9 +39,14 @@ class Localizer:
             self.X_part + self.Y_part - kron(km.sx,x*np.identity(self.dim)) - kron(km.sy,y*np.identity(self.dim))
             )
 
-def get_eigenvalues(sys, *args):
+def get_eigenvalues(name, *args):
     x_list, y_list, kappa_list, num_eigvals = args[0],args[1],args[2], args[3]
-    localizer = Localizer(sys)
+    sys = km.model_builder()
+    if name == km.SSH:
+        localizer = Localizer(SSH(sys, calculate_expectation=False))
+    elif name == km.HALDANE:
+        localizer = Localizer(HALDANE(sys))
+        
     results = np.zeros((len(x_list),len(y_list),len(kappa_list),num_eigvals))
     for ix, x in enumerate(x_list):
         for iy, y in enumerate(y_list):
@@ -87,8 +89,7 @@ def eigenvalues_change(name):
     
     for ih, h in enumerate(h_list):
         km.model['h'] = h
-        sys = km.model_builder()
-        results = get_eigenvalues(sys,x_list,y_list,kappa_list,num_eigvals)
+        results = get_eigenvalues(name,x_list,y_list,kappa_list,num_eigvals)
         for ikappa, kappa in enumerate(kappa_list):
             plt.figure()
             plt.axhline(0, color='grey', linewidth=1, alpha=0.4)
@@ -101,21 +102,103 @@ def eigenvalues_change(name):
             plt.show()
             plt.close()
 
-def edgestate_expectation_1d(localizer):
-    evals, evecs = eigh(localizer.H)
-    def custom_sort(evals, evecs):
-        indices = np.argsort(np.abs(evals))
-        sorted_evals = evals[indices]
-        sorted_eigens = evecs[:, indices]
-        return sorted_evals, sorted_eigens
-    sorted_evals, sorted_evecs = custom_sort(evals, evecs)
-    delta = abs(sorted_evals[0])
-    psiA = (sorted_evecs[:,0]-sorted_evecs[:,1])/sqrt(2)
-    psiB = (sorted_evecs[:,0]+sorted_evecs[:,1])/sqrt(2)
-    #print(psiA.conj().T @ localizer.X @ psiA, psiB.conj().T @ localizer.X @ psiB)
-    w = min(psiA.conj().T @ localizer.X @ psiA, psiB.conj().T @ localizer.X @ psiB)
-    assert np.allclose(np.imag(w), 0, atol=1e-10), "Warning: Data has non-negligible imaginary part!"
-    return np.real(w)
+class SSH:
+    def __init__(self, sys, calculate_expectation=True):
+        H = sys.hamiltonian_submatrix(sparse=False)
+        self.H = H
+        self.dim = np.shape(H)[0]
+        self.l=self.dim-1
+        self.X = np.zeros(H.shape)
+        get_position_operator(sys, self.X, 0)
+        self.Y = np.zeros(H.shape)
+        evals, evecs = eigh(self.H)
+        self.sorted_evals, self.sorted_evecs = custom_sort(evals, evecs)
+        self.delta = abs(self.sorted_evals[0])
+        
+        if calculate_expectation:
+            psiA = (self.sorted_evecs[:,0]-self.sorted_evecs[:,1])/sqrt(2)
+            psiB = (self.sorted_evecs[:,0]+self.sorted_evecs[:,1])/sqrt(2)
+            val1 = psiA.conj().T @ self.X @ psiA
+            val2 = psiB.conj().T @ self.X @ psiB
+            values = np.array([val1, val2])
+            index = np.argmin(values)
+            if index == 0:
+                w, l_w = val1, val2
+            else:
+                w, l_w = val2, val1
+                psiA, psiB = psiB, psiA
+            assert np.allclose(np.imag(w), 0, atol=1e-10), "Warning: Data has non-negligible imaginary part!"
+            self.psiA, self.psiB, self.w, self.l_w = psiA, psiB, np.real(w), np.real(l_w)
+        
+    def theoretical_w(self):
+        ratio = km.model['h']/km.model['t2']
+        Nc = km.model['L']
+        denominator = (1-ratio**2)*(1-ratio**(2*Nc))
+        numerator = ratio**2 + ratio**(2*Nc)*(-Nc+Nc*ratio**2-ratio**2)
+        print(2*numerator/denominator, self.w)
+    
+    def first_order(self, kappa=1):
+        numerator = self.delta
+        x0_precision = self.l/2 - sqrt(-numerator**2/kappa**2 + (self.l/2-self.w)**2)
+        x0_approximation = self.w + numerator**2/(self.l*kappa**2)
+        print("theoretical first-order: ", x0_precision, x0_approximation)
+        
+    def calculate_u(self):
+        even_indices = np.arange(0, len(self.sorted_evals), 2)
+        eigenvalues = self.sorted_evals[even_indices]
+        eigenstates = self.sorted_evecs[:, even_indices]
+        u = 0.0
+        u_n = np.zeros(len(eigenvalues)-1)
+        for n in range(1, len(eigenvalues)):
+            En = eigenvalues[n]
+            psi_n = eigenstates[:, n]
+            tmp =  (2/En) * (self.psiA.conj().T@self.X@psi_n) * (psi_n.conj().T@self.X@self.psiB)
+            if np.isclose(tmp.imag, 0):
+                term = tmp.real
+            else:
+                raise ValueError("tmp is complex")
+            u_n[n-1]=abs(term)
+            u+=term
+        
+        def draw_u():
+            values = []
+            values.append(np.max(u_n))
+            for n, pct in enumerate([70]):
+                threshold = np.percentile(u_n, pct)
+                values.append(np.mean(u_n[u_n >= threshold]))
+            correlation_coefficient, p_value = pearsonr(np.abs(eigenvalues[1:]), u_n)
+        
+        return u
+    
+    def second_order(self, kappa=1):
+        u = self.calculate_u()
+        numerator = self.delta + kappa**2*u
+        x0_precision = self.l/2 - sqrt(-numerator**2/kappa**2 + (self.l/2-self.w)**2)
+        x0_approximation = self.w + numerator**2/(self.l*kappa**2)
+        print("theoretical second-order: ", x0_precision, x0_approximation)
+        
+class HALDANE:
+    def __init__(self, sys, calculate_expectation=True):
+        H = sys.hamiltonian_submatrix(sparse=False)
+        self.H = H
+        self.dim = np.shape(H)[0]
+        self.L = km.model['L']
+        self.X = np.zeros(H.shape)
+        get_position_operator(sys, self.X, 0)
+        self.Y = np.zeros(H.shape)
+        get_position_operator(sys, self.Y, 1)
+        
+        if calculate_expectation:
+            evals, evecs = eigh(self.H)
+            energies, states = custom_sort(evals, evecs)
+            for a in np.linspace(0.1, 10, 100):
+                sigma = a/self.L
+                gaussian_values = np.exp(-(energies-0)**2 / (2 * sigma**2))
+                gaussian_values /= np.max(gaussian_values)
+                gaussian_values[energies>0] = 0
+        
+        
+
 
 def edgestate_location_1d():
     # h
@@ -131,10 +214,11 @@ def edgestate_location_1d():
         plt.grid(True, linestyle='--', alpha=0.4)
         km.model['h'] = h
         sys = km.model_builder()
-        localizer = Localizer(sys)
-        w = edgestate_expectation_1d(localizer)
+        ssh = SSH(sys, calculate_expectation=True)
+        localizer = Localizer(ssh)
+        
         # TODO: 还有显著性的问题
-        plt.axhline(w, color='red', linewidth=1,alpha=0.8)
+        plt.axhline(ssh.w, color='red', linewidth=1,alpha=0.8)
         location_change = np.zeros(num_kappa)
         
         def local_chern_number(x):
@@ -149,7 +233,7 @@ def edgestate_location_1d():
         plt.ylabel('location(x)')
         #plt.ylim(0, 0.5)
         plt.xlabel(r'$\kappa$')
-        #plt.show()
+        plt.show()
         #plt.savefig(f"/Users/ruiqixu/Desktop/kappa/localizer numerical/ssh/localizer location.png", dpi=300, bbox_inches='tight')
         plt.close()
         
@@ -169,7 +253,8 @@ def edgestate_location_2d():
     for ih, h in enumerate(h_list):
         km.model['h'] = h
         sys = km.model_builder()
-        localizer = Localizer(sys)
+        haldane = HALDANE(sys)
+        localizer = Localizer(haldane)
         
         def binary_search(f, low, high, xtol):
             while (high - low) > xtol:
@@ -205,15 +290,28 @@ def edgestate_location_2d():
             plt.savefig(f"/Users/ruiqixu/Desktop/{edge_name}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
             plt.close()
     
-eigenvalues_change(km.SSH)
+np.set_printoptions(suppress=True)
+#eigenvalues_change(km.SSH)
 #edgestate_location_2d()
 #edgestate_location_1d()
 
-# km.change_model(km.SSH, km.NONE)
-# km.model['L']=4
-# km.model['h']=0.5
-# sys=km.model_builder()
-# localizer=Localizer(sys)
+km.change_model(km.SSH, km.NONE)
+# km.change_model(km.HALDANE, km.NOMASS)
+km.model['L']=10
+#km.model['W']=25
+km.model['h']=0.5
+sys=km.model_builder()
+ssh = SSH(sys, calculate_expectation=True)
+print(ssh.delta/(ssh.l/2-ssh.w))
+
+
+
+
+
+
+
+
+
 
 
 

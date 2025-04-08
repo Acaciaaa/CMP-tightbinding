@@ -155,9 +155,60 @@ def defect_graphene():
                         arrowprops=dict(arrowstyle='-|>', color='dimgray', lw=0.1,mutation_scale=16))
         ax.axis('off')
         #plt.tight_layout()
-        plt.savefig(f"/Users/ruiqixu/Desktop/model.png",dpi=fig.dpi, bbox_inches='tight')
+        #plt.savefig(f"/Users/ruiqixu/Desktop/model.png",dpi=fig.dpi, bbox_inches='tight')
+        plt.show()
+        
+    def draw_fig1a():
+        def color_sites(site):
+            if 'a' in site.family.name or 'b' in site.family.name:
+                return mcolors.to_rgba("black", alpha=0.8)
+        def color_hoppings(tar, sour):
+            if sour.family != tar.family:  
+                return 'black' 
+            else:
+                return 'crimson'
+        
+        fig, ax = plt.subplots()
+        kwant.plot(sys, ax=ax,site_color=color_sites,site_size=0.08,hop_color=color_hoppings,hop_lw=0.05)
+        ax.set_aspect('equal', 'box')
+        ax.plot([0, 2.6], [0, 0], color='grey', linewidth=2, linestyle='--')
+        ax.axis('off')
+        plt.tight_layout() 
+        #plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/fig1a.png",dpi=fig.dpi, bbox_inches='tight')
+        #plt.show()
+        
+    def draw_fig1b():
+        def color_sites(site):
+            if 'a' in site.family.name or 'b' in site.family.name:
+                return mcolors.to_rgba("black", alpha=0.8)
+        def color_hoppings(tar, sour):
+            if sour.family != tar.family:  
+                return 'black' 
+            else:
+                return 'crimson'
+        
+        fig, ax = plt.subplots()
+        kwant.plot(sys, ax=ax,site_color=color_sites,site_size=0.08,hop_color=color_hoppings,hop_lw=0.05)
+        ax.set_aspect('equal', 'box')
+        hex_pos = np.array([[0.5, -0.5/sqrt(3)], [0.5, 0.5/sqrt(3)], [0, 1/sqrt(3)], [-0.5, 0.5/sqrt(3)], [-0.5, -0.5/sqrt(3)], [0, -1/sqrt(3)]])
+        arrow_pos, arrow_k, x_k = [], [], [-1,-1,2,-2,1,1]
+        for i in [0, 2, 4, 1, 3, 5]:
+            j = (i+2)%6
+            arrow_pos.append((hex_pos[i]+hex_pos[j])/2)
+            arrow_k.append((hex_pos[j][1]-hex_pos[i][1])/(hex_pos[j][0]-hex_pos[i][0]))
+        epsilon, ratio = 0.1, 0.5
+        for i in range(6):
+            x, y, delta_x = arrow_pos[i][0], arrow_pos[i][1], epsilon*x_k[i]
+            ax.annotate('', xy=(x+ratio*delta_x, y+ratio*delta_x*arrow_k[i]), xytext=(x-(1-ratio)*delta_x, y-(1-ratio)*delta_x*arrow_k[i]),
+                        arrowprops=dict(arrowstyle='-|>', color='crimson', lw=5,mutation_scale=50))
+        ax.axis('off')
+        ax.text(0, -0.12, r'$ih$', fontsize=50, ha='center', va='center')
+        plt.tight_layout() 
+        plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/fig1b.png",dpi=fig.dpi, bbox_inches='tight')
         #plt.show()
     
+    #draw_fig1a()
+    #draw_fig1b()
     #draw_model()
     #kwant.plot(sys)
     
@@ -244,14 +295,35 @@ def haldane():
     for neighbor in neighbors_graphene:
         sys[kwant.builder.HoppingKind(neighbor, b, a)] = -t1
 
-    temp = h*cmath.exp((1.j)*pi/2.)
+    temp = h*cmath.exp((1.j)*model['phi']*pi)
     neighbors_imag = [(0, 1), (-1, 0), (1, -1)]
     for neighbor in neighbors_imag:
         sys[kwant.builder.HoppingKind(neighbor, b, b)] = temp
         sys[kwant.builder.HoppingKind(neighbor, a, a)] = temp.conjugate()
 
     #kwant.plot(sys)
+    def draw_model():
+        def color_sites(site):
+            if 'a' in site.family.name or 'b' in site.family.name:
+                return mcolors.to_rgba("black", alpha=0.8)
+        def color_hoppings(tar, sour):
+            if sour.family != tar.family:  
+                return 'black' 
+            else:
+                return 'white'
+        
+        fig, ax = plt.subplots()
+        plt.scatter(0, 0, color='red', s=10)
+        plt.axhline(-0.5/sqrt(3), color='pink',alpha=0.5,linewidth=5)
+        plt.axvline(0, color='pink',alpha=0.5,linewidth=5)
+        kwant.plot(sys, ax=ax,site_color=color_sites,site_size=0.1,hop_color=color_hoppings,hop_lw=0.05)
+        ax.set_aspect('equal', 'box')
+        ax.axis('off')
+        #plt.tight_layout()
+        #plt.savefig(f"/Users/ruiqixu/Desktop/kappa/chern marker/1dpath.png", dpi=300, bbox_inches='tight')
+        plt.show()
     
+    #draw_model()
     return sys.finalized()
 
 def change_model(name, category):
@@ -283,7 +355,7 @@ def change_model(name, category):
                         cc = 1.0,
                         m = 2*sqrt(3), t1 = 1.0, h = 0,
                         kappa = 1.0,
-                        L=7, W=7))
+                        L=7, W=7, phi = 1/2))
         if category==NOMASS:
             model['m'] = 0
         if category==NONTRIVIAL:
@@ -336,3 +408,14 @@ def change_para(func):
         print('change_para error')
         system.exit()
     return x, y
+
+plt.rcParams['font.family'] = 'Times New Roman'
+plt.rcParams['mathtext.fontset'] = 'stix'
+plt.rcParams['axes.labelsize'] = 12
+plt.rcParams['xtick.labelsize'] = 10
+plt.rcParams['ytick.labelsize'] = 10
+plt.rcParams['legend.fontsize'] = 10
+
+change_model(DEFECT, SINGLE)
+model['L']=model['W']=1
+model_builder()
