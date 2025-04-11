@@ -30,7 +30,7 @@ def custom_sort(evals, evecs, ifcurrent=False):
     else:
         sorted_eigens = evecs[:, indices]
     return sorted_evals, sorted_eigens
-def current_Jr(name, category):
+def current_Jr(name, category, ax=None, h=0):
     CUTOFF, GAUSSIAN, STATE = 'max_E', 'gaussian', 'state'
 
     def edge_info(sys):
@@ -154,65 +154,58 @@ def current_Jr(name, category):
                 sum_current += sorted_current[i]
         return way, sum_current
     
-    def draw_current():
-        h_list = [0.7,0.8,0.9,1,1.1,1.2,1.3,1.4,1.5]
-        bounds = [(-2.5, 2.5), (-2.5, 2.5)]
-        for h in h_list:
-            km.model['h'] = h
-            sys = km.model_builder()
-            fig, ax = plt.subplots()
-            ax.set_aspect('equal')
-            plt.xlim(bounds[0][0], bounds[0][1])
-            plt.ylim(bounds[1][0], bounds[1][1])
-            kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.5, 0.5, 0.5, 0.3),hop_lw=0.07)
-            evals, current = pure_current_info(sys)
-            way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 2/km.model['L'])
-            index = -1
-            for tail, head in sys.graph:
-                index += 1
-                if abs(sum_current[index]) < 0.0001:
-                    continue
-                start_point, end_point = sys.sites[head].pos, sys.sites[tail].pos
-                #x_start, y_start, x_end, y_end = round(p1[0], 3), round(p1[1], 3), round(p2[0], 3), round(p2[1], 3)
-                if np.linalg.norm(start_point) > 4.5:
-                    continue
-                weight = sum_current[index]
-                if weight < 0:
-                    start_point, end_point = end_point, start_point
-                    weight = -weight
-                #mid_x = (x_start + x_end) / 2
-                #mid_y = (y_start + y_end) / 2
-                #r = sqrt(mid_x*mid_x+mid_y*mid_y)
-                #if r > 4:
-                #    continue
-                normalized = (end_point-start_point)/np.linalg.norm(end_point - start_point)
-                arrow_length = normalized * weight * 40
-                if np.linalg.norm(arrow_length) < 0.16:
-                    continue
+    def draw_current(ax, h):
+        bounds = [(-2.6, 2.6), (-2.5, 2.5)]
+        km.model['h'] = h
+        sys = km.model_builder()
+        ax.set_aspect('equal')
+        plt.xlim(bounds[0][0], bounds[0][1])
+        plt.ylim(bounds[1][0], bounds[1][1])
+        kwant.plot(sys, ax=ax, show=False, site_color=(0.6, 0.7, 1.0, 0.0), hop_color=(0.5, 0.5, 0.5, 0.3),hop_lw=0.07)
+        evals, current = pure_current_info(sys)
+        way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 2/km.model['L'])
+        index = -1
+        for tail, head in sys.graph:
+            index += 1
+            if abs(sum_current[index]) < 0.0001:
+                continue
+            start_point, end_point = sys.sites[head].pos, sys.sites[tail].pos
+            #x_start, y_start, x_end, y_end = round(p1[0], 3), round(p1[1], 3), round(p2[0], 3), round(p2[1], 3)
+            if np.linalg.norm(start_point) > 4.5:
+                continue
+            weight = sum_current[index]
+            if weight < 0:
+                start_point, end_point = end_point, start_point
+                weight = -weight
+            #mid_x = (x_start + x_end) / 2
+            #mid_y = (y_start + y_end) / 2
+            #r = sqrt(mid_x*mid_x+mid_y*mid_y)
+            #if r > 4:
+            #    continue
+            normalized = (end_point-start_point)/np.linalg.norm(end_point - start_point)
+            arrow_length = normalized * weight * 55
+            if np.linalg.norm(arrow_length) < 0.2:
+                continue
 
-                if np.linalg.norm(start_point) > 0.8:
-                    mutation_scale = 10
-                    color = 'red'
-                    alpha = 1
-                else:
-                    mutation_scale = 8
-                    color = 'black'
-                    alpha = 0.2
-                arrow = patches.FancyArrowPatch(start_point, start_point+arrow_length,
-                                                arrowstyle='-|>', connectionstyle='arc3,rad=0.0', 
-                                                mutation_scale=mutation_scale, color=color, alpha=alpha)
-                ax.add_patch(arrow)
-                # if 0<=mid_x<=3 and 0<=mid_y<=3:
-                #     ax.text(mid_x, mid_y, f'{weight:.4f}'.lstrip('0').replace('-0.', '-.'), color='red', fontsize=8, ha='center', va='center')
-            ax.set_xticklabels([])
-            ax.set_yticklabels([])
-            ax.set_xticks([])
-            ax.set_yticks([])
-            ax.text(0.98, 0.02, rf"$h={h}$",transform=ax.transAxes,ha='right', va='bottom',fontsize=12, color='black')
-            plt.tight_layout()
-            plt.savefig(f"/Users/ruiqixu/Desktop/visualization/{h:.1f}.png",dpi=fig.dpi, bbox_inches='tight')
-            #plt.show()
-            plt.close()
+            if np.linalg.norm(start_point) > 0.8:
+                mutation_scale = 5
+                color = 'red'
+                alpha = 1
+            else:
+                mutation_scale = 5
+                color = 'black'
+                alpha = 0.2
+            arrow = patches.FancyArrowPatch(start_point, start_point+arrow_length,
+                                            arrowstyle='-|>', connectionstyle='arc3,rad=0.0', 
+                                            mutation_scale=mutation_scale, color=color, alpha=alpha, linewidth=0.8)
+            ax.add_patch(arrow)
+            # if 0<=mid_x<=3 and 0<=mid_y<=3:
+            #     ax.text(mid_x, mid_y, f'{weight:.4f}'.lstrip('0').replace('-0.', '-.'), color='red', fontsize=8, ha='center', va='center')
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+        ax.set_xticks([])
+        ax.set_yticks([])
+        ax.text(0.975, 0.82, rf"$h={h}$",transform=ax.transAxes,ha='right', va='bottom',fontsize=10)
     
     def magnitude_info(sum_current, buckets=np.array([])):
         temp = [None] * len(sort_r)
@@ -265,7 +258,7 @@ def current_Jr(name, category):
     #     sys = model_builder()
     #     find_distribution(sys)
         # draw_distribution()
-    #draw_current()
+    draw_current(ax, h)
     
     def draw_h_fixed(whichsum):
         h_list = [0.7, 1.3]
@@ -303,13 +296,13 @@ def current_Jr(name, category):
             ax.plot(x, -0.02, 'o', markerfacecolor=color, markeredgecolor=color, markersize=3,clip_on=False)
         
         ax_inset = inset_axes(ax, width="50%", height="50%",loc='upper right')
-        image = mpimg.imread("/Users/ruiqixu/Desktop/tmp/current_new/update/update2/r.png")
+        image = mpimg.imread("/Users/ruiqi/Documents/tmp/currents/r.png")
         ax_inset.imshow(image)
         ax_inset.axis("off")
-        plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/fig4a.png",dpi=300, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig4a.png",dpi=300, bbox_inches='tight')
         #plt.show()
         
-    draw_h_fixed('J(r)')
+    #draw_h_fixed('J(r)')
     #draw_h_fixed('J(r)_r')
 
     def draw_r_fixed(r):
@@ -760,7 +753,7 @@ def write_data():
         positions_list.append([sys.sites[head].pos, sys.sites[tail].pos])
     positions = np.array(positions_list)
     num_edges = positions.shape[0]
-    storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/', 
+    storage = DataStorage(file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/', 
                           num_edges=num_edges, num_h=num_h, num_energies=num_energies)
     storage.write_positions(positions)
     
@@ -881,7 +874,7 @@ def read_data():
         L_list = [9, 13, 17, 21, 25, 29]
         a_list = [0.1, 0.5, 1, 2, 4]
         for iL, L in enumerate(L_list):
-            storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/')
+            storage = DataStorage(file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/')
             storage.num_h = 400
             if L == 29:
                 storage.num_h = 200
@@ -914,7 +907,7 @@ def read_data():
         cmap = plt.get_cmap('viridis')
         colors = [cmap(i) for i in np.linspace(0, 1, 5)][::-1]
         for iL, L in enumerate(L_list):
-            storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/')
+            storage = DataStorage(file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/')
             storage.num_h = 400
             positions = storage.read_positions()
             h_list = np.linspace(0.0, 2.0, storage.num_h)
@@ -947,7 +940,7 @@ def read_data():
         a_list = [0.5, 1.0, 2.0, 4.0]
         diff_area = [[None, 0.4],[0.4, 0.6],[None, 0.6,], [None, None]]
         for iL, L in enumerate(L_list):
-            storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/')
+            storage = DataStorage(file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/')
             if L == 29:
                 storage.num_h = 200
             else:
@@ -961,7 +954,7 @@ def read_data():
                     sum_currents = get_sumcurrents(storage, GAUSSIAN, a/L)
                     flow_list = np.dot(sum_currents, signs)
                     big_flow_list[iarea,ia]=flow_list
-            np.save(f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/big_flow_list1.npy', big_flow_list)
+            np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list1.npy', big_flow_list)
     
     def currents_diffsize_two_visualizations_plot_plot():
         L_list = [9, 13, 17, 21, 25, 29]
@@ -972,7 +965,7 @@ def read_data():
         plt.figure()
         plt.axhline(0, color='grey', linewidth=1, linestyle='--',alpha=0.5)
         for iL, L in enumerate(L_list):
-            big_flow_list = np.load(f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/big_flow_list1.npy')
+            big_flow_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list1.npy')
             if L == 29:
                 h_list = np.linspace(0.0, 2.0, 200)
             else:
@@ -990,26 +983,24 @@ def read_data():
         ax.vlines(0.9, -0.08, 0, linestyles='--', colors='black',linewidth=1,alpha=0.5)
         ax.plot(0.9, -0.08, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
         
-        ax_inset = inset_axes(ax, width="45%", height="45%",loc='upper right')
-        image = mpimg.imread("/Users/ruiqixu/Desktop/tmp/current_new/update/visualization/1.3.png")
-        ax_inset.imshow(image)
+        ax_inset = inset_axes(ax, width="45%", height="45%",loc='upper right',bbox_to_anchor=(0, -0.01, 1, 1),bbox_transform=ax.transAxes)
+        current_Jr(km.DEFECT, km.SINGLE, ax_inset, 1.3)
         ax_inset.axis("off")
         
-        ax_inset = inset_axes(ax, width="45%", height="45%",loc='lower left')
-        image = mpimg.imread("/Users/ruiqixu/Desktop/tmp/current_new/update/visualization/0.7.png")
-        ax_inset.imshow(image)
+        ax_inset = inset_axes(ax, width="45%", height="45%",loc='lower left',bbox_to_anchor=(0, 0.01, 1, 1),bbox_transform=ax.transAxes)
+        current_Jr(km.DEFECT, km.SINGLE, ax_inset, 0.7)
         ax_inset.axis("off")
         
         fig = plt.gcf()
         fig.set_size_inches(10, 6)
-        plt.show()
-        #plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/fig1c.png",dpi=300, bbox_inches='tight')
+        #plt.show()
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1c.png",dpi=300, bbox_inches='tight')
         
     def new_cancel_out_plot():
         h_list = np.linspace(0.0, 2.0, 400)
-        big_flow_list = np.load('/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/25/big_flow_list.npy')
+        big_flow_list = np.load('/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/25/big_flow_list1.npy')
         my_legends = [['forestgreen', 'inner NNN', '--'],['forestgreen', 'inner NN', ':'],
-                          ['forestgreen','inner', '-'], ['crimson', 'total', '-']]
+                          ['forestgreen','inner NNN+NN', '-'], ['crimson', 'total system', '-']]
         plt.figure()
         plt.axhline(0, color='grey', linewidth=1, linestyle=':',alpha=0.4)
         for i, my_legend in enumerate(my_legends):
@@ -1025,14 +1016,14 @@ def read_data():
         plt.ylabel(r'$I_\text{circ}$')
         plt.legend(frameon=False,loc='lower left')
         plt.tight_layout()
-        plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/fig4b.png",dpi=300, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig4b.png",dpi=300, bbox_inches='tight')
         #plt.show()
             
     def cancel_out_plot():
         L_list = [25]#[9, 13, 17, 21, 25, 29]
         a = 1
         for iL, L in enumerate(L_list):
-            storage = DataStorage(file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/')
+            storage = DataStorage(file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/')
             storage.num_h = 400
             positions = storage.read_positions()
             h_list = np.linspace(0.0, 2.0, storage.num_h)
@@ -1074,7 +1065,7 @@ def read_data():
     #cancel_out_plot()
     #new_cancel_out_plot()
     #storage_info()
-    #currents_diffsize_two_visualizations_plot_plot()
+    currents_diffsize_two_visualizations_plot_plot()
 
 import sympy as sp
 def one_hex_model():
@@ -1371,7 +1362,7 @@ def draw_distance_with_color():
     (0, -0.5/sqrt(3), 'royalblue')]
     for x, y, color in dot_positions:
         ax.scatter(x, y, color=color, s=50, clip_on=False)
-    plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/r.png",dpi=300, bbox_inches='tight')
+    plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/r.png",dpi=300, bbox_inches='tight')
     #plt.show()
 
 #draw_distance_with_number()

@@ -174,7 +174,7 @@ def defect_graphene():
         ax.plot([0, 2.6], [0, 0], color='grey', linewidth=2, linestyle='--')
         ax.axis('off')
         plt.tight_layout() 
-        #plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/fig1a.png",dpi=fig.dpi, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1a.png",dpi=fig.dpi, bbox_inches='tight')
         #plt.show()
         
     def draw_fig1b():
@@ -204,7 +204,7 @@ def defect_graphene():
         ax.axis('off')
         ax.text(0, -0.12, r'$ih$', fontsize=50, ha='center', va='center')
         plt.tight_layout() 
-        plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/fig1b.png",dpi=fig.dpi, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1b.png",dpi=fig.dpi, bbox_inches='tight')
         #plt.show()
     
     #draw_fig1a()

@@ -24,14 +24,13 @@ import h5py
 from math import sqrt, pi, sin, cos, dist, isclose
 import warnings
 from matplotlib.lines import Line2D
-from line_profiler import LineProfiler
 
 import KwantModel as km
 
 class Cstorage:
     def __init__(self, L):
         self.L=L
-        self.file_path=f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/C/{L}/'
+        self.file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/C/{L}/'
         C_file='C_diag.h5'
         self.C_file = self.file_path + C_file
         self.num_h = 400
@@ -64,7 +63,6 @@ class Cstorage:
         with h5py.File(self.C_file, 'r') as C_file:
             C_diag = C_file['C'][h_index,...]
         return C_diag
-
 
 class ChernMarker:
     # fix position info
@@ -425,7 +423,7 @@ plt.rcParams['legend.fontsize'] = 10
 # pstorage = Cstorage(37)
 # pstorage.write_C()
 
-def hc(ax):
+def store_hc():
     h_list, h_29_list = np.linspace(0, 2, 400),np.linspace(0, 2, 200)
     hc_list = np.zeros((14, 4))
     current_L_list = [9, 13, 17, 21, 25, 29]
@@ -433,7 +431,7 @@ def hc(ax):
     marker_L_list = [9, 13, 17, 21, 25, 29, 33, 37]
     edge_list = [0.2, 0.3, 0.4, 0.5]
     for iL, L in enumerate(current_L_list):
-        big_flow_list = np.load(f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/single/{L}/big_flow_list1.npy')
+        big_flow_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list1.npy')
         for ia, a in enumerate(a_list):
             crossing_index = np.where(big_flow_list[3, ia] > 0)[0][-1]
             if L == 29:
@@ -456,8 +454,14 @@ def hc(ax):
             crossing_index = np.where(tmp_list > 0)[0][-1]
             zero=(h_list[crossing_index]+h_list[crossing_index+1])/2
             hc_list[6+iL, iedge] = zero
-    #np.save(f'/Users/ruiqixu/Library/CloudStorage/Dropbox-GaTech/Ruiqi Xu/data/hc_list.npy', hc_list)
-    
+    np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/hc_list.npy', hc_list)
+
+def hc(ax):
+    current_L_list = [9, 13, 17, 21, 25, 29]
+    a_list = [0.5, 1, 2, 4]
+    marker_L_list = [9, 13, 17, 21, 25, 29, 33, 37]
+    edge_list = [0.2, 0.3, 0.4, 0.5]
+    hc_list = np.load('/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/hc_list.npy')
     for iedge, edge in enumerate(edge_list):
         if edge == 0.2:
             ax.plot(marker_L_list, hc_list[6:, iedge], label = rf'edge$={edge}$', marker='o', linestyle='-', color='mediumblue',markersize=3.5,linewidth=2,alpha=1)
@@ -552,8 +556,8 @@ def marker_diffsize():
     zoomin(ax_inset)
     ax_inset.tick_params(axis='both', labelsize=8)
     
-    #plt.show()
-    plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/fig3.png",dpi=300, bbox_inches='tight')
+    plt.show()
+    #plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig3.png",dpi=300, bbox_inches='tight')
 
 marker_diffsize()
     

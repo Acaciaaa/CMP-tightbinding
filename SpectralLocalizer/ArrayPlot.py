@@ -26,7 +26,6 @@ import pandas as pd
 from math import sqrt, pi, sin, cos, dist, isclose
 import warnings
 from matplotlib.lines import Line2D
-from line_profiler import LineProfiler
 
 plt.rcParams['font.family'] = 'Times New Roman'
 plt.rcParams['mathtext.fontset'] = 'stix'
@@ -42,7 +41,7 @@ gap_num = 100
 
 
 def extract_data():
-    folder_path = '/Users/ruiqixu/Desktop/tmp/current_new/update/update2'
+    folder_path = '/Users/ruiqi/Documents/tmp/currents/array'
     pattern = re.compile(r'Lx=(\d+)')
     chern_h_list = np.zeros(chern_num)
     chern_list = np.zeros((l_num, chern_num))
@@ -84,49 +83,50 @@ def extract_data():
             gap_h_list=third_column
         gap_list[l_index]=last_column
         
-    np.save(f'/Users/ruiqixu/Desktop/tmp/current_new/update/update2/array/chern_h_list.npy', chern_h_list)
-    np.save(f'/Users/ruiqixu/Desktop/tmp/current_new/update/update2/array/chern_list.npy', chern_list)
-    np.save(f'/Users/ruiqixu/Desktop/tmp/current_new/update/update2/array/gap_h_list.npy', gap_h_list)
-    np.save(f'/Users/ruiqixu/Desktop/tmp/current_new/update/update2/array/gap_list.npy', gap_list)
+    np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/array/chern_h_list.npy', chern_h_list)
+    np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/array/chern_list.npy', chern_list)
+    np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/array/gap_h_list.npy', gap_h_list)
+    np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/array/gap_list.npy', gap_list)
 #extract_data()
 
-chern_h_list = np.load(f'/Users/ruiqixu/Desktop/tmp/current_new/update/update2/array/chern_h_list.npy')
-chern_list = np.load(f'/Users/ruiqixu/Desktop/tmp/current_new/update/update2/array/chern_list.npy')
-gap_h_list = np.load(f'/Users/ruiqixu/Desktop/tmp/current_new/update/update2/array/gap_h_list.npy')
-gap_list = np.load(f'/Users/ruiqixu/Desktop/tmp/current_new/update/update2/array/gap_list.npy')
-cmap = plt.get_cmap('viridis')
-colors = [cmap(i) for i in np.linspace(0, 1, l_num)][::-1]
+def draw_data():
+    chern_h_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/array/chern_h_list.npy')
+    chern_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/array/chern_list.npy')
+    gap_h_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/array/gap_h_list.npy')
+    gap_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/array/gap_list.npy')
+    cmap = plt.get_cmap('viridis')
+    colors = [cmap(i) for i in np.linspace(0, 1, l_num)][::-1]
 
-for l_set in [[6, 12, 18], [8, 10, 14, 16, 20]]:
-    fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(8, 6), height_ratios=[1, 1.6])
-    ax1.axhline(0, color='grey', linewidth=1, linestyle='--',alpha=0.5)
-    
-    for l in l_set:
-        l_index = l//2-3
-        ax1.plot(chern_h_list[:5], chern_list[l_index,:5], label = f'{l}', marker='o', linestyle='-', color=colors[l_index],markersize=4,linewidth=2,alpha=0.8,clip_on=False)
-        ax1.plot(chern_h_list[5:8], chern_list[l_index,5:8], marker='o', linestyle='-', color=colors[l_index],markersize=3.5,linewidth=1.5,alpha=0.8,clip_on=False)
-        ax2.plot(gap_h_list, gap_list[l_index], label = f'{l}', marker='o', linestyle='-',color=colors[l_index],markersize=2.5,linewidth=1.2,alpha=0.8)
-    
-    ax1.set_ylabel(r"$C$")
-    ax1.set_ylim(-1, 1)
-    ax1.tick_params(direction='in',which='both')
-    #ax1.minorticks_on()
-    ax2.set_ylabel("Gap")
-    ax2.set_ylim(0, 0.1)
-    ax2.tick_params(direction='in',which='both')
-    #ax2.minorticks_on()
-    
-    ax1.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
-    ax2.set_xlabel(r"$h$")
-    ax2.set_xlim(-0.05, 2.05)
-    plt.xticks(np.arange(0, 2.1, 0.1))
-    plt.subplots_adjust(hspace=0.1)
-    if l_set[0] == 6:
-        legend = ax1.legend(loc='center left', title=r"$l=6\mathcal{Z}$",title_fontsize=10,fontsize=8)
-        plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/fig2b.png",dpi=300, bbox_inches='tight')
-    else:
-        legend = ax1.legend(loc='center left', title=r"$l\neq6\mathcal{Z}$",title_fontsize=10,fontsize=8)
-        plt.savefig(f"/Users/ruiqixu/Desktop/tmp/current_new/update/update2/fig2a.png",dpi=300, bbox_inches='tight')
-    #legend.get_frame().set_visible(False)
-    #plt.show()
-    
+    for l_set in [[6, 12, 18], [8, 10, 14, 16, 20]]:
+        fig, (ax1, ax2) = plt.subplots(2, 1, sharex=True, figsize=(8, 6), height_ratios=[1, 1.6])
+        ax1.axhline(0, color='grey', linewidth=1, linestyle='--',alpha=0.5)
+        
+        for l in l_set:
+            l_index = l//2-3
+            ax1.plot(chern_h_list[:5], chern_list[l_index,:5], label = f'{l}', marker='o', linestyle='-', color=colors[l_index],markersize=4,linewidth=2,alpha=0.8,clip_on=False)
+            ax1.plot(chern_h_list[5:8], chern_list[l_index,5:8], marker='o', linestyle='-', color=colors[l_index],markersize=3.5,linewidth=1.5,alpha=0.8,clip_on=False)
+            ax2.plot(gap_h_list, gap_list[l_index], label = f'{l}', marker='o', linestyle='-',color=colors[l_index],markersize=2.5,linewidth=1.2,alpha=0.8)
+        
+        ax1.set_ylabel(r"$C$")
+        ax1.set_ylim(-1, 1)
+        ax1.tick_params(direction='in',which='both')
+        #ax1.minorticks_on()
+        ax2.set_ylabel("Gap")
+        ax2.set_ylim(0, 0.1)
+        ax2.tick_params(direction='in',which='both')
+        #ax2.minorticks_on()
+        
+        ax1.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False)
+        ax2.set_xlabel(r"$h$")
+        ax2.set_xlim(-0.05, 2.05)
+        plt.xticks(np.arange(0, 2.1, 0.1))
+        plt.subplots_adjust(hspace=0.1)
+        if l_set[0] == 6:
+            legend = ax1.legend(loc='center left', title=r"$l=6\mathcal{Z}$",title_fontsize=10,fontsize=8)
+            plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig2b.png",dpi=300, bbox_inches='tight')
+        else:
+            legend = ax1.legend(loc='center left', title=r"$l\neq6\mathcal{Z}$",title_fontsize=10,fontsize=8)
+            plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig2a.png",dpi=300, bbox_inches='tight')
+        #legend.get_frame().set_visible(False)
+        #plt.show()
+draw_data()
