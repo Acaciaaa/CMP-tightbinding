@@ -158,7 +158,7 @@ def defect_graphene():
         #plt.savefig(f"/Users/ruiqixu/Desktop/model.png",dpi=fig.dpi, bbox_inches='tight')
         plt.show()
         
-    def draw_fig1a():
+    def draw_fig1a_sub1():
         def color_sites(site):
             if 'a' in site.family.name or 'b' in site.family.name:
                 return mcolors.to_rgba("black", alpha=0.8)
@@ -174,10 +174,10 @@ def defect_graphene():
         ax.plot([0, 2.6], [0, 0], color='grey', linewidth=2, linestyle='--')
         ax.axis('off')
         plt.tight_layout() 
-        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1a.png",dpi=fig.dpi, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1a_sub1.png",dpi=fig.dpi, bbox_inches='tight')
         #plt.show()
         
-    def draw_fig1b():
+    def draw_fig1a_sub2():
         def color_sites(site):
             if 'a' in site.family.name or 'b' in site.family.name:
                 return mcolors.to_rgba("black", alpha=0.8)
@@ -204,11 +204,62 @@ def defect_graphene():
         ax.axis('off')
         ax.text(0, -0.12, r'$ih$', fontsize=50, ha='center', va='center')
         plt.tight_layout() 
-        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1b.png",dpi=fig.dpi, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1a_sub2.png",dpi=fig.dpi, bbox_inches='tight')
+        #plt.show()
+
+    def draw_fig4b_sub():
+        def color_sites(site):
+            if 'a' in site.family.name or 'b' in site.family.name:
+                return mcolors.to_rgba("black", alpha=0.4)
+        def color_hoppings(tar, sour):
+            #print(sour.family, sour.index, sour.pos, sour.tag)
+            if sour.family != tar.family:
+                if np.allclose(sour.pos, [0.5,-0.5/sqrt(3)], rtol=1e-5, atol=1e-8) and np.allclose(tar.pos, [0.5,0.5/sqrt(3)], rtol=1e-5, atol=1e-8):
+                    return mcolors.to_rgba("black", alpha=1.0)
+                return mcolors.to_rgba("black", alpha=0.3)
+            else:
+                if np.allclose(sour.pos, [0.5,-0.5/sqrt(3)], rtol=1e-5, atol=1e-8) and np.allclose(tar.pos, [0,1/sqrt(3)], rtol=1e-5, atol=1e-8):
+                    return mcolors.to_rgba("crimson", alpha=1)
+                if np.allclose(sour.pos, [0,-1/sqrt(3)], rtol=1e-5, atol=1e-8) and np.allclose(tar.pos, [0.5,0.5/sqrt(3)], rtol=1e-5, atol=1e-8):
+                    return mcolors.to_rgba("crimson", alpha=1)
+                return mcolors.to_rgba("crimson", alpha=0.3)
+        
+        fig, ax = plt.subplots()
+        kwant.plot(sys, ax=ax,site_color=color_sites,site_size=0.08,hop_color=color_hoppings,hop_lw=0.05)
+        ax.set_aspect('equal', 'box')
+        ax.axis('off')
+        ax.text(0.35, 0.43, 'NNN', fontsize=40, ha='center', va='center', color='crimson')
+        ax.text(0.65, 0, 'NN', fontsize=40, ha='center', va='center', color='black')
+        plt.tight_layout() 
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig4b_sub.png",dpi=fig.dpi, bbox_inches='tight')
+        #plt.show()
+
+    def draw_tab_sub():
+        def color_sites(site):
+            if 'a' in site.family.name or 'b' in site.family.name:
+                return mcolors.to_rgba("black", alpha=0.8)
+        def color_hoppings(tar, sour):
+            #print(sour.family, sour.index, sour.pos, sour.tag)
+            if sour.family != tar.family:
+                return 'black'
+            else:
+                return 'crimson'
+        
+        fig, ax = plt.subplots()
+        kwant.plot(sys, ax=ax,site_color=color_sites,site_size=0.08,hop_color=color_hoppings,hop_lw=0.05)
+        ax.set_aspect('equal', 'box')
+        ax.axis('off')
+        ax.text(0.62, -0.27, r'$A$', fontsize=40, ha='center', va='center')
+        ax.text(0.62, 0.27, r'$B$', fontsize=40, ha='center', va='center')
+        ax.text(0.1, 0.64, r'$C$', fontsize=40, ha='center', va='center')
+        plt.tight_layout() 
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/tab_sub.png",dpi=fig.dpi, bbox_inches='tight')
         #plt.show()
     
-    #draw_fig1a()
-    #draw_fig1b()
+    #draw_fig1a_sub1()
+    #draw_fig1a_sub2()
+    #draw_fig4b_sub()
+    #draw_tab_sub()
     #draw_model()
     #kwant.plot(sys)
     

@@ -2,7 +2,6 @@ from __future__ import division
 import kwant
 from scipy.sparse.linalg import eigsh, eigs
 from numpy.linalg import eigh
-from scipy.linalg import kron
 from scipy.optimize import minimize_scalar
 # import pylab as py
 import matplotlib.pyplot as plt
@@ -30,13 +29,13 @@ def custom_sort(evals, evecs):
 class Localizer:
     def __init__(self, model):
         self.H, self.X, self.Y, self.dim = model.H, model.X, model.Y, model.dim
-        self.H_part = kron(km.sz, self.H)
-        self.X_part = kron(km.sx, self.X)
-        self.Y_part = kron(km.sy, self.Y)
+        self.H_part = np.kron(km.sz, self.H)
+        self.X_part = np.kron(km.sx, self.X)
+        self.Y_part = np.kron(km.sy, self.Y)
         
     def get_localizer(self, x=0, y=0, kappa=1):
         return self.H_part + kappa * (
-            self.X_part + self.Y_part - kron(km.sx,x*np.identity(self.dim)) - kron(km.sy,y*np.identity(self.dim))
+            self.X_part + self.Y_part - np.kron(km.sx,x*np.identity(self.dim)) - np.kron(km.sy,y*np.identity(self.dim))
             )
 
 def get_eigenvalues(name, *args):
@@ -45,7 +44,7 @@ def get_eigenvalues(name, *args):
     if name == km.SSH:
         localizer = Localizer(SSH(sys, calculate_expectation=False))
     elif name == km.HALDANE:
-        localizer = Localizer(HALDANE(sys))
+        localizer = Localizer(HALDANE(sys, calculate_expectation=False))
         
     results = np.zeros((len(x_list),len(y_list),len(kappa_list),num_eigvals))
     for ix, x in enumerate(x_list):
@@ -60,8 +59,8 @@ def eigenvalues_change(name):
     if name == km.HALDANE:
         # h
         km.change_model(km.HALDANE, km.NOMASS)
-        km.model['L']=km.model['W']=9
-        h_list = np.array([1])
+        km.model['L']=km.model['W']=25
+        h_list = np.array([0.2])
         # x y
         x_edge, y_edge = km.rectangle_vertex(km.model['L'], km.model['W'])
         num_cc = 50
@@ -69,9 +68,9 @@ def eigenvalues_change(name):
         y_list=np.array([0])
         x_list=np.linspace(x_edge-2,x_edge,num=num_x)
         # kappa
-        kappa_list = np.array([0.1,0.5,1])
+        kappa_list = np.array([0.01, 0.1, 0.5,1,3,5])
         # num_eigvals
-        num_eigvals = 20
+        num_eigvals = 10
     elif name == km.SSH:
         # h (t1)
         km.change_model(km.SSH, km.NONE)
@@ -98,9 +97,10 @@ def eigenvalues_change(name):
             plt.title(rf"$\kappa={kappa}$", loc='left')
             plt.xlabel('x')
             plt.ylabel('localizer eigenvalues')
-            #plt.savefig(f"/Users/ruiqixu/Desktop/kappa/localizer numerical/ssh/eigenvalues/{kappa}.png", dpi=300, bbox_inches='tight')
-            plt.show()
-            plt.close()
+            plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/localizer_visualization/{kappa}.png", dpi=300, bbox_inches='tight')
+            #plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/ssh/localizer_visualization/{kappa}.png", dpi=300, bbox_inches='tight')
+            #plt.show()
+            #plt.close()
 
 class SSH:
     def __init__(self, sys, calculate_expectation=True):
@@ -188,17 +188,42 @@ class HALDANE:
         self.Y = np.zeros(H.shape)
         get_position_operator(sys, self.Y, 1)
         
+        a_list = [0.1, 0.5, 2, 5, 10]
+        self.expectation = np.array([
+            [12.49089714, 11.97480348, 11.97480022, 10.94310137, 10.65326011, 10.94310144,],
+            [12.49089722, 11.97480328, 11.97480002, 10.94310146, 10.65325867, 10.94310154,],
+            [12.49126787, 11.97378827, 11.97378632, 10.94355909, 10.6465343,  10.94355913,],
+            [12.49244111, 11.96498075, 11.96497814, 10.94571343, 10.61084394, 10.94571152,],
+            [10.18463698,  9.77692345,  9.77202316,  8.93519283,  8.68369129,  8.9285602, ]])
+        self.expectation = np.zeros((5, 6))
         if calculate_expectation:
+            x_positions, y_positions = np.diag(self.X), np.diag(self.Y)
             evals, evecs = eigh(self.H)
             energies, states = custom_sort(evals, evecs)
-            for a in np.linspace(0.1, 10, 100):
+            for ia, a in enumerate(a_list):
                 sigma = a/self.L
                 gaussian_values = np.exp(-(energies-0)**2 / (2 * sigma**2))
-                gaussian_values /= np.max(gaussian_values)
                 gaussian_values[energies>0] = 0
-        
-        
+                gaussian_values /= np.sum(gaussian_values)
+                for iarea, (axis, fixed_point) in enumerate([('x', 0.5/sqrt(3)), ('x', 1/sqrt(3)), ('x', 2/sqrt(3)), 
+                                          ('y', 0), ('y', 0.5), ('y', 1)]):
+                    if axis == 'x':
+                        mask = (np.abs(y_positions - fixed_point) < 1e-3) & (x_positions > 0)
+                    else:
+                        mask = (np.abs(x_positions - fixed_point) < 1e-3) & (y_positions > 0)
+                    P = np.diag(mask)
 
+                    each_expectations = np.zeros(len(energies))
+                    for i in range(len(energies)):
+                        psi = states[:, i]
+                        if axis == 'x':
+                            numerator = np.vdot(psi, P @ self.X @ P @ psi)
+                        else:
+                            numerator = np.vdot(psi, P @ self.Y @ P @ psi)
+                        denominator = np.vdot(psi, P @ psi)
+                        each_expectations[i]=(np.real(numerator / denominator))
+                    self.expectation[ia, iarea] = np.sum(gaussian_values * each_expectations)
+        
 
 def edgestate_location_1d():
     # h
@@ -240,69 +265,74 @@ def edgestate_location_1d():
 def edgestate_location_2d():
     # h
     km.change_model(km.HALDANE, km.NOMASS)
-    km.model['L']=km.model['W']=9
-    h_list = np.array([1])
+    km.model['L']=km.model['W']=25
+    h_list = np.array([0.2])
     # x y -> 2 areas
     x_edge, y_edge = km.rectangle_vertex(km.model['L'], km.model['W'])
     x_list=np.array([0, 0.5, 1])
     y_list=np.array([0.5/sqrt(3), 1/sqrt(3), 2/sqrt(3)])
+    a_list = [0.1, 0.5, 2, 5, 10]
     # kappa
     num_kappa = 90
     kappa_list = np.linspace(0, 3, num_kappa)
+    iarea = -1
     
-    for ih, h in enumerate(h_list):
-        km.model['h'] = h
-        sys = km.model_builder()
-        haldane = HALDANE(sys)
-        localizer = Localizer(haldane)
+    for axis, fixed_axis, fixed_list, edge_limit, edge_name in [('y', 'x', x_list, y_edge, 'upper'), ('x', 'y', y_list, x_edge, 'right')]:
+        for fixed_value in fixed_list:
+            iarea += 1
+            for ih, h in enumerate(h_list):
+                plt.figure()
+                plt.grid(True, linestyle='--', alpha=0.4)
+                km.model['h'] = h
+                sys = km.model_builder()
+                haldane = HALDANE(sys, calculate_expectation=False)
+                localizer = Localizer(haldane)
+                for ia, a in enumerate(a_list):
+                    plt.axhline(haldane.expectation[ia, iarea], linewidth=1,alpha=0.8, label=f'a={a}')
         
-        def binary_search(f, low, high, xtol):
-            while (high - low) > xtol:
-                mid = (low + high) / 2
-                if f(mid) == 1 and f(high) == 0:
-                    low = mid
-                else:
-                    high = mid
-            return (low + high) / 2
-        def local_chern_number(val, axis, kappa):
-            if axis == 'x':
-                L = localizer.get_localizer(x=val, y=fixed_value, kappa=kappa)
-            else:  # axis == 'y'
-                L = localizer.get_localizer(x=fixed_value, y=val, kappa=kappa)
-            evals, _ = eigh(L)
-            pos = np.sum(evals > 0)
-            neg = np.sum(evals < 0)
-            return ((pos - neg)/2)
-
-        for axis, fixed_axis, fixed_list, edge_limit, edge_name in [('y', 'x', x_list, y_edge, 'upper'), ('x', 'y', y_list, x_edge, 'right')]:
-            plt.figure()
-            plt.grid(True, linestyle='--', alpha=0.4)
-            for fixed_value in fixed_list:
+                def binary_search(f, low, high, xtol):
+                    while (high - low) > xtol:
+                        mid = (low + high) / 2
+                        if f(mid) == 1 and f(high) == 0:
+                            low = mid
+                        else:
+                            high = mid
+                    return (low + high) / 2
+                def local_chern_number(val, axis, kappa):
+                    if axis == 'x':
+                        L = localizer.get_localizer(x=val, y=fixed_value, kappa=kappa)
+                    else:  # axis == 'y'
+                        L = localizer.get_localizer(x=fixed_value, y=val, kappa=kappa)
+                    evals, _ = eigh(L)
+                    pos = np.sum(evals > 0)
+                    neg = np.sum(evals < 0)
+                    return ((pos - neg)/2)
+            
                 location_change = np.zeros(num_kappa)
                 for ikappa, kappa in enumerate(kappa_list):
                     location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-5)
                 plt.scatter(kappa_list, location_change, label=f"{fixed_axis}={fixed_value:.2f}", s=2, alpha=0.6)
-            plt.legend()
-            plt.ylabel(axis)
-            plt.ylim(0, edge_limit)
-            plt.xlabel('kappa')
-            plt.title(f"{edge_name} edge")
-            plt.savefig(f"/Users/ruiqixu/Desktop/{edge_name}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
-            plt.close()
+                plt.legend()
+                plt.ylabel(axis)
+                plt.ylim(0, edge_limit)
+                plt.xlabel('kappa')
+                plt.title(f"{edge_name} edge")
+                plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
+                plt.close()
     
 np.set_printoptions(suppress=True)
-#eigenvalues_change(km.SSH)
-#edgestate_location_2d()
+#eigenvalues_change(km.HALDANE)
+edgestate_location_2d()
 #edgestate_location_1d()
 
-km.change_model(km.SSH, km.NONE)
+#km.change_model(km.SSH, km.NONE)
 # km.change_model(km.HALDANE, km.NOMASS)
-km.model['L']=10
-#km.model['W']=25
-km.model['h']=0.5
-sys=km.model_builder()
-ssh = SSH(sys, calculate_expectation=True)
-print(ssh.delta/(ssh.l/2-ssh.w))
+# km.model['L']=10
+# km.model['W']=25
+# km.model['h']=0.5
+# sys=km.model_builder()
+# ssh = SSH(sys, calculate_expectation=True)
+# print(ssh.delta/(ssh.l/2-ssh.w))
 
 
 

@@ -258,7 +258,7 @@ def current_Jr(name, category, ax=None, h=0):
     #     sys = model_builder()
     #     find_distribution(sys)
         # draw_distribution()
-    draw_current(ax, h)
+    #draw_current(ax, h)
     
     def draw_h_fixed(whichsum):
         h_list = [0.7, 1.3]
@@ -287,13 +287,14 @@ def current_Jr(name, category, ax=None, h=0):
         ax.minorticks_on()
         plt.ylim(-0.02, 0.03)
         dot_positions = [
-            (1.323,'grey'),
-            (0.866,'crimson'),
-            (1.5,'forestgreen'),
-            (0.5,'black'),
-            (0.289, 'royalblue')]
-        for (x, color) in dot_positions:
-            ax.plot(x, -0.02, 'o', markerfacecolor=color, markeredgecolor=color, markersize=3,clip_on=False)
+            (1.323,r'$d$'),
+            (0.866,r'$c$'),
+            (1.5,r'$e$'),
+            (0.5,r'$b$'),
+            (0.289, r'$a$')]
+        for (x, text) in dot_positions:
+            ax.plot(x, -0.02, 'o', markerfacecolor='black', markeredgecolor='black', markersize=3,clip_on=False)
+            ax.text(x, -0.0185, text, fontsize=11, ha='center', va='center',clip_on=False)
         
         ax_inset = inset_axes(ax, width="50%", height="50%",loc='upper right')
         image = mpimg.imread("/Users/ruiqi/Documents/tmp/currents/r.png")
@@ -817,11 +818,10 @@ def read_data():
             sigma = args[0]
             for h_i in range(storage.num_h):
                 energies = storage.read_energies(h_i)
-                negative_energies = energies[energies < 0]
                 #center = negative_energies[np.argmin(np.abs(negative_energies))]
                 gaussian_values = np.exp(-(energies-0)**2 / (2 * sigma**2))
-                gaussian_values /= np.max(gaussian_values)
-                gaussian_values[energies<=0] = 0
+                gaussian_values[energies>=0] = 0
+                gaussian_values /= np.sum(gaussian_values)
                 
                 currents = storage.read_currents(h_i)
                 sum_currents[h_i] = np.array([np.dot(currents[j], gaussian_values) for j in range(storage.num_edges)])
@@ -954,7 +954,7 @@ def read_data():
                     sum_currents = get_sumcurrents(storage, GAUSSIAN, a/L)
                     flow_list = np.dot(sum_currents, signs)
                     big_flow_list[iarea,ia]=flow_list
-            np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list1.npy', big_flow_list)
+            np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list_correction.npy', big_flow_list)
     
     def currents_diffsize_two_visualizations_plot_plot():
         L_list = [9, 13, 17, 21, 25, 29]
@@ -990,6 +990,19 @@ def read_data():
         ax_inset = inset_axes(ax, width="45%", height="45%",loc='lower left',bbox_to_anchor=(0, 0.01, 1, 1),bbox_transform=ax.transAxes)
         current_Jr(km.DEFECT, km.SINGLE, ax_inset, 0.7)
         ax_inset.axis("off")
+
+        ax.annotate(
+            '',
+            xy=(0.67, -0.073),
+            xytext=(0.7, -0.08),
+            arrowprops=dict(arrowstyle="->", color='black'))
+        ax.plot(0.7, -0.08, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
+        ax.annotate(
+            '',
+            xy=(1.33, -0.073),
+            xytext=(1.3, -0.08),
+            arrowprops=dict(arrowstyle="->", color='black'))
+        ax.plot(1.3, -0.08, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
         
         fig = plt.gcf()
         fig.set_size_inches(10, 6)
@@ -999,8 +1012,8 @@ def read_data():
     def new_cancel_out_plot():
         h_list = np.linspace(0.0, 2.0, 400)
         big_flow_list = np.load('/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/25/big_flow_list1.npy')
-        my_legends = [['forestgreen', 'inner NNN', '--'],['forestgreen', 'inner NN', ':'],
-                          ['forestgreen','inner NNN+NN', '-'], ['crimson', 'total system', '-']]
+        my_legends = [['forestgreen', 'NNN', '--'],['forestgreen', 'NN', ':'],
+                          ['forestgreen','NNN+NN', '-'], ['royalblue', 'total system', '-']]
         plt.figure()
         plt.axhline(0, color='grey', linewidth=1, linestyle=':',alpha=0.4)
         for i, my_legend in enumerate(my_legends):
@@ -1015,7 +1028,11 @@ def read_data():
         plt.xlabel(r'$h$')
         plt.ylabel(r'$I_\text{circ}$')
         plt.legend(frameon=False,loc='lower left')
-        plt.tight_layout()
+
+        ax_inset = inset_axes(ax, width="35%", height="35%",loc='upper right')
+        image = mpimg.imread("/Users/ruiqi/Documents/tmp/currents/fig4b_sub.png")
+        ax_inset.imshow(image)
+        ax_inset.axis("off")
         plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig4b.png",dpi=300, bbox_inches='tight')
         #plt.show()
             
@@ -1301,13 +1318,13 @@ plt.rcParams['xtick.labelsize'] = 10
 plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 #write_data()
-read_data()
+#read_data()
 
 #test_triangle()
 #middle_hex()
 #one_hex_model()
 
-def draw_distance_with_number():
+def draw_distance_with_letter():
     km.change_model(km.DEFECT, km.SINGLE)
     km.model['L']=km.model['W']=9
     sys = km.model_builder()
@@ -1323,19 +1340,17 @@ def draw_distance_with_number():
     ax.set_yticklabels([])
     ax.set_xticks([])
     ax.set_yticks([])
+    ax.axis('off')
     text_positions = [
-    (-1, sqrt(3)/2, r'$r=1.323$'),
-    (0, sqrt(3)/2, r'$r=0.866$'),
-    (-1.5, 0, r'$r=1.5$'),
-    (-0.5, 0.0, r'$r=0.5$'),
-    (0, -0.5/sqrt(3), r'$r=0.289$')]
+    (-1, sqrt(3)/2, r'$d$'),
+    (0, sqrt(3)/2, r'$c$'),
+    (-1.5, 0, r'$e$'),
+    (-0.5, 0.0, r'$b$'),
+    (0, -0.5/sqrt(3), r'$a$')]
     for x, y, text in text_positions:
-        ax.scatter(x, y, color='black', s=30)
-        ax.text(x+0.1, y, text, fontsize=14, ha='left', va='center')
-    # for spine in ax.spines.values():
-    #     spine.set_color((0.5, 0.5, 0.5, 0.5))  # RGBA 格式（红, 绿, 蓝, 透明度）
-    #     spine.set_linewidth(2) 
-    plt.savefig(f"/Users/ruiqixu/Desktop/r.png",dpi=300, bbox_inches='tight')
+        ax.scatter(x, y, color='black', s=50, clip_on=False)
+        ax.text(x+0.1, y, text, fontsize=25, ha='left', va='center')
+    plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/r.png",dpi=300, bbox_inches='tight')
     #plt.show()
     
 def draw_distance_with_color():
@@ -1365,7 +1380,7 @@ def draw_distance_with_color():
     plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/r.png",dpi=300, bbox_inches='tight')
     #plt.show()
 
-#draw_distance_with_number()
+#draw_distance_with_letter()
 #draw_distance_with_color()
 
-#current_Jr(km.DEFECT, km.SINGLE)
+current_Jr(km.DEFECT, km.SINGLE)
