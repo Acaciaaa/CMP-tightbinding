@@ -64,11 +64,13 @@ def eigenvalues_change(name):
         # x y
         x_edge, y_edge = km.rectangle_vertex(km.model['L'], km.model['W'])
         num_cc = 50
-        num_x = int((x_edge-x_edge+2)*num_cc)
+        #num_x = int((x_edge-x_edge+2)*num_cc)
+        num_x = int((x_edge-0)*num_cc)
         y_list=np.array([0])
-        x_list=np.linspace(x_edge-2,x_edge,num=num_x)
+        #x_list=np.linspace(x_edge-2,x_edge,num=num_x)
+        x_list=np.linspace(0,x_edge,num=num_x)
         # kappa
-        kappa_list = np.array([0.01, 0.1, 0.5,1,3,5])
+        kappa_list = np.array([0.1,1,3])#0.01, 0.1, 0.5,1,3,5])
         # num_eigvals
         num_eigvals = 10
     elif name == km.SSH:
@@ -273,8 +275,8 @@ def edgestate_location_2d():
     y_list=np.array([0.5/sqrt(3), 1/sqrt(3), 2/sqrt(3)])
     a_list = [0.1, 0.5, 2, 5, 10]
     # kappa
-    num_kappa = 90
-    kappa_list = np.linspace(0, 3, num_kappa)
+    num_kappa = 30
+    kappa_list = np.linspace(0.1, 3, num_kappa)
     iarea = -1
     
     for axis, fixed_axis, fixed_list, edge_limit, edge_name in [('y', 'x', x_list, y_edge, 'upper'), ('x', 'y', y_list, x_edge, 'right')]:
@@ -317,12 +319,13 @@ def edgestate_location_2d():
                 plt.ylim(0, edge_limit)
                 plt.xlabel('kappa')
                 plt.title(f"{edge_name} edge")
-                plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
+                #plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
+                plt.show()
                 plt.close()
     
 np.set_printoptions(suppress=True)
-#eigenvalues_change(km.HALDANE)
-edgestate_location_2d()
+eigenvalues_change(km.HALDANE)
+#edgestate_location_2d()
 #edgestate_location_1d()
 
 #km.change_model(km.SSH, km.NONE)

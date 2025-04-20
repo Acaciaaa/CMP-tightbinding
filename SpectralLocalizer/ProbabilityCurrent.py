@@ -258,7 +258,7 @@ def current_Jr(name, category, ax=None, h=0):
     #     sys = model_builder()
     #     find_distribution(sys)
         # draw_distribution()
-    #draw_current(ax, h)
+    draw_current(ax, h)
     
     def draw_h_fixed(whichsum):
         h_list = [0.7, 1.3]
@@ -965,7 +965,7 @@ def read_data():
         plt.figure()
         plt.axhline(0, color='grey', linewidth=1, linestyle='--',alpha=0.5)
         for iL, L in enumerate(L_list):
-            big_flow_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list1.npy')
+            big_flow_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list.npy')
             if L == 29:
                 h_list = np.linspace(0.0, 2.0, 200)
             else:
@@ -1006,8 +1006,8 @@ def read_data():
         
         fig = plt.gcf()
         fig.set_size_inches(10, 6)
-        #plt.show()
-        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1c.png",dpi=300, bbox_inches='tight')
+        plt.show()
+        #plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1b.png",dpi=300, bbox_inches='tight')
         
     def new_cancel_out_plot():
         h_list = np.linspace(0.0, 2.0, 400)
@@ -1078,11 +1078,92 @@ def read_data():
                 #plt.show()
                 plt.close()
 
+    def currents_diffsize_correction():
+        L_list = [9, 13, 17, 21, 25, 29]
+        a_list = [0.5, 1.0, 2.0, 4.0]
+        ia = 2
+        cmap = plt.get_cmap('viridis')
+        colors = [cmap(i) for i in np.linspace(0, 1, 6)][::-1]
+        plt.figure()
+        plt.axhline(0, color='grey', linewidth=1, linestyle='--',alpha=0.5)
+        for iL, L in enumerate(L_list):
+            big_flow_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list_correction.npy')
+            if L == 29:
+                h_list = np.linspace(0.0, 2.0, 200)
+            else:
+                h_list = np.linspace(0.0, 2.0, 400)
+            plt.plot(h_list, big_flow_list[3, ia], label=rf'$L={L}$', color=colors[iL], linewidth=1.5, alpha = 0.7)
+        plt.xlabel(r'$h$')
+        plt.ylabel(r'$I_{\text{circ}}$')
+        plt.xticks(np.arange(0, 2.1, 0.1))
+        #plt.ylim(-0.08, 0.08)
+        plt.legend(loc='upper center',frameon=False,labelspacing=0.7)
+        ax = plt.gca()
+        ax.text(0.02, 0.98, rf"$a={a_list[ia]}$", transform=ax.transAxes, fontsize=10, verticalalignment='top')
+        ax.tick_params(direction='in', which='both')
+        ax.minorticks_on()
+        # ax.vlines(0.9, -0.08, 0, linestyles='--', colors='black',linewidth=1,alpha=0.5)
+        # ax.plot(0.9, -0.08, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
+        
+        # ax_inset = inset_axes(ax, width="45%", height="45%",loc='upper right',bbox_to_anchor=(0, -0.01, 1, 1),bbox_transform=ax.transAxes)
+        # current_Jr(km.DEFECT, km.SINGLE, ax_inset, 1.3)
+        # ax_inset.axis("off")
+        
+        # ax_inset = inset_axes(ax, width="45%", height="45%",loc='lower left',bbox_to_anchor=(0, 0.01, 1, 1),bbox_transform=ax.transAxes)
+        # current_Jr(km.DEFECT, km.SINGLE, ax_inset, 0.7)
+        # ax_inset.axis("off")
+
+        # ax.annotate(
+        #     '',
+        #     xy=(0.67, -0.073),
+        #     xytext=(0.7, -0.08),
+        #     arrowprops=dict(arrowstyle="->", color='black'))
+        # ax.plot(0.7, -0.08, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
+        # ax.annotate(
+        #     '',
+        #     xy=(1.33, -0.073),
+        #     xytext=(1.3, -0.08),
+        #     arrowprops=dict(arrowstyle="->", color='black'))
+        # ax.plot(1.3, -0.08, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
+        
+        fig = plt.gcf()
+        fig.set_size_inches(10, 6)
+        #plt.show()
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1b_correction.png",dpi=300, bbox_inches='tight')
+
+    def new_cancel_out_plot_correction():
+        h_list = np.linspace(0.0, 2.0, 400)
+        big_flow_list = np.load('/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/25/big_flow_list_correction.npy')
+        my_legends = [['forestgreen', 'NNN', '--'],['forestgreen', 'NN', ':'],
+                          ['forestgreen','NNN+NN', '-'], ['royalblue', 'total system', '-']]
+        plt.figure()
+        plt.axhline(0, color='grey', linewidth=1, linestyle=':',alpha=0.4)
+        for i, my_legend in enumerate(my_legends):
+            plt.plot(h_list, big_flow_list[i,2], linestyle=my_legend[2], color=my_legend[0], label=my_legend[1])
+        ax = plt.gca()
+        y_min, y_max = ax.get_ylim()
+        y_max = max(abs(y_min), abs(y_max))
+        ax.set_ylim(-y_max, y_max)
+        ax.text(0.02, 0.98, rf"$L={25},\;a={2.0}$", transform=ax.transAxes, fontsize=10, verticalalignment='top')
+        ax.tick_params(direction='in', which='both')
+        ax.minorticks_on()
+        plt.xlabel(r'$h$')
+        plt.ylabel(r'$I_\text{circ}$')
+        plt.legend(frameon=False,loc='lower left')
+
+        # ax_inset = inset_axes(ax, width="35%", height="35%",loc='upper right')
+        # image = mpimg.imread("/Users/ruiqi/Documents/tmp/currents/fig4b_sub.png")
+        # ax_inset.imshow(image)
+        # ax_inset.axis("off")
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig4b_correction.png",dpi=300, bbox_inches='tight')
+        #plt.show()
+
     #all_plot()
     #cancel_out_plot()
     #new_cancel_out_plot()
     #storage_info()
-    currents_diffsize_two_visualizations_plot_plot()
+    #currents_diffsize_correction()
+    #new_cancel_out_plot_correction()
 
 import sympy as sp
 def one_hex_model():
@@ -1318,7 +1399,7 @@ plt.rcParams['xtick.labelsize'] = 10
 plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 #write_data()
-#read_data()
+read_data()
 
 #test_triangle()
 #middle_hex()
@@ -1383,4 +1464,4 @@ def draw_distance_with_color():
 #draw_distance_with_letter()
 #draw_distance_with_color()
 
-current_Jr(km.DEFECT, km.SINGLE)
+#current_Jr(km.DEFECT, km.SINGLE)
