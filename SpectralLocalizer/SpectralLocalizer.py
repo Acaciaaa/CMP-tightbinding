@@ -70,7 +70,7 @@ def eigenvalues_change(name):
         #x_list=np.linspace(x_edge-2,x_edge,num=num_x)
         x_list=np.linspace(0,x_edge,num=num_x)
         # kappa
-        kappa_list = np.array([0.1,1,3])#0.01, 0.1, 0.5,1,3,5])
+        kappa_list = np.array([2.0])#0.01,0.1,0.5,1.0,2.0,3.0])
         # num_eigvals
         num_eigvals = 10
     elif name == km.SSH:
@@ -191,13 +191,13 @@ class HALDANE:
         get_position_operator(sys, self.Y, 1)
         
         a_list = [0.1, 0.5, 2, 5, 10]
+        self.expectation = np.zeros((5, 6))
         self.expectation = np.array([
             [12.49089714, 11.97480348, 11.97480022, 10.94310137, 10.65326011, 10.94310144,],
             [12.49089722, 11.97480328, 11.97480002, 10.94310146, 10.65325867, 10.94310154,],
             [12.49126787, 11.97378827, 11.97378632, 10.94355909, 10.6465343,  10.94355913,],
             [12.49244111, 11.96498075, 11.96497814, 10.94571343, 10.61084394, 10.94571152,],
             [10.18463698,  9.77692345,  9.77202316,  8.93519283,  8.68369129,  8.9285602, ]])
-        self.expectation = np.zeros((5, 6))
         if calculate_expectation:
             x_positions, y_positions = np.diag(self.X), np.diag(self.Y)
             evals, evecs = eigh(self.H)
@@ -275,8 +275,8 @@ def edgestate_location_2d():
     y_list=np.array([0.5/sqrt(3), 1/sqrt(3), 2/sqrt(3)])
     a_list = [0.1, 0.5, 2, 5, 10]
     # kappa
-    num_kappa = 30
-    kappa_list = np.linspace(0.1, 3, num_kappa)
+    num_kappa = 20
+    kappa_list = np.linspace(0.01, 2, num_kappa)
     iarea = -1
     
     for axis, fixed_axis, fixed_list, edge_limit, edge_name in [('y', 'x', x_list, y_edge, 'upper'), ('x', 'y', y_list, x_edge, 'right')]:
@@ -290,8 +290,10 @@ def edgestate_location_2d():
                 haldane = HALDANE(sys, calculate_expectation=False)
                 localizer = Localizer(haldane)
                 for ia, a in enumerate(a_list):
-                    plt.axhline(haldane.expectation[ia, iarea], linewidth=1,alpha=0.8, label=f'a={a}')
-        
+                    tmp = haldane.expectation[ia, iarea]
+                    plt.plot([0, 2], [tmp, tmp], linewidth=1, alpha=0.8, label=f'a={a}')
+                plt.legend()
+
                 def binary_search(f, low, high, xtol):
                     while (high - low) > xtol:
                         mid = (low + high) / 2
@@ -305,27 +307,30 @@ def edgestate_location_2d():
                         L = localizer.get_localizer(x=val, y=fixed_value, kappa=kappa)
                     else:  # axis == 'y'
                         L = localizer.get_localizer(x=fixed_value, y=val, kappa=kappa)
-                    evals, _ = eigh(L)
-                    pos = np.sum(evals > 0)
-                    neg = np.sum(evals < 0)
-                    return ((pos - neg)/2)
+                    evals = np.linalg.eigvalsh(L)
+                    return (np.count_nonzero(evals > 0) - np.count_nonzero(evals < 0)) / 2
             
                 location_change = np.zeros(num_kappa)
                 for ikappa, kappa in enumerate(kappa_list):
-                    location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-5)
-                plt.scatter(kappa_list, location_change, label=f"{fixed_axis}={fixed_value:.2f}", s=2, alpha=0.6)
-                plt.legend()
+                    if local_chern_number(0,axis,kappa) == local_chern_number(edge_limit,axis,kappa):
+                        location_change[ikappa] = 0
+                    location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-3)
+                np.save(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/location_change_{iarea}", location_change)
+                np.save(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/location_change_{iarea}", location_change)
+                plt.scatter(kappa_list, location_change, s=2, alpha=0.6)
+                plt.title(f"{fixed_axis}={fixed_value:.2f}", loc='left')
                 plt.ylabel(axis)
-                plt.ylim(0, edge_limit)
-                plt.xlabel('kappa')
+                plt.xlabel(r'$\kappa$')
                 plt.title(f"{edge_name} edge")
-                #plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
-                plt.show()
-                plt.close()
+                plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
+                plt.savefig(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
+                #plt.show()
+                #plt.close()
+                
     
 np.set_printoptions(suppress=True)
-eigenvalues_change(km.HALDANE)
-#edgestate_location_2d()
+#eigenvalues_change(km.HALDANE)
+edgestate_location_2d()
 #edgestate_location_1d()
 
 #km.change_model(km.SSH, km.NONE)

@@ -353,7 +353,7 @@ def haldane():
         sys[kwant.builder.HoppingKind(neighbor, a, a)] = temp.conjugate()
 
     #kwant.plot(sys)
-    def draw_model():
+    def draw_model_marker1d():
         def color_sites(site):
             if 'a' in site.family.name or 'b' in site.family.name:
                 return mcolors.to_rgba("black", alpha=0.8)
@@ -374,7 +374,32 @@ def haldane():
         #plt.savefig(f"/Users/ruiqixu/Desktop/kappa/chern marker/1dpath.png", dpi=300, bbox_inches='tight')
         plt.show()
     
-    #draw_model()
+    def draw_model_localizer():
+        def color_sites(site):
+            if 'a' in site.family.name or 'b' in site.family.name:
+                return mcolors.to_rgba("black", alpha=0.8)
+        def color_hoppings(tar, sour):
+            if sour.family != tar.family:  
+                return 'black' 
+            else:
+                return 'grey'
+        
+        fig, ax = plt.subplots()
+        plt.scatter(0, 0, color='red', s=8)
+        plt.axhline(0.5/sqrt(3), color='pink',alpha=0.5,linewidth=3)
+        plt.axhline(1/sqrt(3), color='pink',alpha=0.5,linewidth=3)
+        plt.axhline(2/sqrt(3), color='pink',alpha=0.5,linewidth=3)
+        plt.axvline(0, color='pink',alpha=0.5,linewidth=3)
+        plt.axvline(0.5, color='pink',alpha=0.5,linewidth=3)
+        plt.axvline(1, color='pink',alpha=0.5,linewidth=3)
+        kwant.plot(sys, ax=ax,site_color=color_sites,site_size=0.1,hop_color=color_hoppings,hop_lw=0.05)
+        ax.set_aspect('equal', 'box')
+        ax.axis('off')
+        plt.tight_layout()
+        plt.savefig(f"/Users/ruiqi/Desktop/haldane_model.png", dpi=300, bbox_inches='tight')
+        #plt.show()
+    #draw_model_marker1d()
+    #draw_model_localizer()
     return sys.finalized()
 
 def change_model(name, category):
@@ -467,6 +492,7 @@ plt.rcParams['xtick.labelsize'] = 10
 plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 
-change_model(DEFECT, SINGLE)
-model['L']=model['W']=1
+#change_model(DEFECT, SINGLE)
+change_model(HALDANE, NOMASS)
+model['L']=model['W']=25
 model_builder()
