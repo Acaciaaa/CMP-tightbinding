@@ -180,7 +180,7 @@ class SSH:
         print("theoretical second-order: ", x0_precision, x0_approximation)
         
 class HALDANE:
-    def __init__(self, sys, calculate_expectation=True):
+    def __init__(self, sys):
         H = sys.hamiltonian_submatrix(sparse=False)
         self.H = H
         self.dim = np.shape(H)[0]
@@ -189,43 +189,50 @@ class HALDANE:
         get_position_operator(sys, self.X, 0)
         self.Y = np.zeros(H.shape)
         get_position_operator(sys, self.Y, 1)
-        
-        a_list = [0.1, 0.5, 2, 5, 10]
-        self.expectation = np.zeros((5, 6))
-        self.expectation = np.array([
-            [12.49089714, 11.97480348, 11.97480022, 10.94310137, 10.65326011, 10.94310144,],
-            [12.49089722, 11.97480328, 11.97480002, 10.94310146, 10.65325867, 10.94310154,],
-            [12.49126787, 11.97378827, 11.97378632, 10.94355909, 10.6465343,  10.94355913,],
-            [12.49244111, 11.96498075, 11.96497814, 10.94571343, 10.61084394, 10.94571152,],
-            [10.18463698,  9.77692345,  9.77202316,  8.93519283,  8.68369129,  8.9285602, ]])
-        if calculate_expectation:
-            x_positions, y_positions = np.diag(self.X), np.diag(self.Y)
-            evals, evecs = eigh(self.H)
-            energies, states = custom_sort(evals, evecs)
-            for ia, a in enumerate(a_list):
-                sigma = a/self.L
-                gaussian_values = np.exp(-(energies-0)**2 / (2 * sigma**2))
-                gaussian_values[energies>0] = 0
-                gaussian_values /= np.sum(gaussian_values)
-                for iarea, (axis, fixed_point) in enumerate([('x', 0.5/sqrt(3)), ('x', 1/sqrt(3)), ('x', 2/sqrt(3)), 
-                                          ('y', 0), ('y', 0.5), ('y', 1)]):
-                    if axis == 'x':
-                        mask = (np.abs(y_positions - fixed_point) < 1e-3) & (x_positions > 0)
-                    else:
-                        mask = (np.abs(x_positions - fixed_point) < 1e-3) & (y_positions > 0)
-                    P = np.diag(mask)
 
-                    each_expectations = np.zeros(len(energies))
-                    for i in range(len(energies)):
-                        psi = states[:, i]
-                        if axis == 'x':
-                            numerator = np.vdot(psi, P @ self.X @ P @ psi)
-                        else:
-                            numerator = np.vdot(psi, P @ self.Y @ P @ psi)
-                        denominator = np.vdot(psi, P @ psi)
-                        each_expectations[i]=(np.real(numerator / denominator))
-                    self.expectation[ia, iarea] = np.sum(gaussian_values * each_expectations)
+    def calculate_expectation(self):
+        x_positions, y_positions = np.diag(self.X), np.diag(self.Y)
+        evals, evecs = eigh(self.H)
+        energies, states = custom_sort(evals, evecs)
         
+        for iarea, (axis, fixed_point) in enumerate([('x', 0.5/sqrt(3)), ('x', 1/sqrt(3)), ('x', 2/sqrt(3)), 
+                                    ('y', 0), ('y', 0.5), ('y', 1)]):
+            if axis == 'x':
+                mask = (np.abs(y_positions - fixed_point) < 1e-3) & (x_positions > 0)
+            else:
+                mask = (np.abs(x_positions - fixed_point) < 1e-3) & (y_positions > 0)
+            P = np.diag(mask)
+
+            each_expectations = np.zeros(len(energies))
+            for i in range(len(energies)):
+                psi = states[:, i]
+                if axis == 'x':
+                    numerator = np.vdot(psi, P @ self.X @ P @ psi)
+                else:
+                    numerator = np.vdot(psi, P @ self.Y @ P @ psi)
+                denominator = np.vdot(psi, P @ psi)
+                each_expectations[i]=(np.real(numerator / denominator))
+            self.expectation[ia, iarea] = np.sum(gaussian_values * each_expectations)
+
+    def dos(self):
+        bins = 100
+        evals, evecs = eigh(self.H)
+        energies, states = custom_sort(evals, evecs)
+        plt.hist(energies, bins=bins, range = (-1, 0), density=True, edgecolor='black', alpha=0.7)
+        plt.xlabel("Energy")
+        plt.ylabel("DOS")
+        plt.grid(True)
+        plt.show()
+
+    def ldos(self):
+        bins = 100
+        evals, evecs = eigh(self.H)
+        energies, states = custom_sort(evals, evecs)
+        plt.hist(energies, bins=bins, range = (-1, 0), density=True, edgecolor='black', alpha=0.7)
+        plt.xlabel("Energy")
+        plt.ylabel("DOS")
+        plt.grid(True)
+        plt.show()
 
 def edgestate_location_1d():
     # h
@@ -264,78 +271,73 @@ def edgestate_location_1d():
         #plt.savefig(f"/Users/ruiqixu/Desktop/kappa/localizer numerical/ssh/localizer location.png", dpi=300, bbox_inches='tight')
         plt.close()
         
-def edgestate_location_2d():
+def edgestate_location_2d(storage_info):
     # h
     km.change_model(km.HALDANE, km.NOMASS)
     km.model['L']=km.model['W']=25
-    h_list = np.array([0.2])
-    # x y -> 2 areas
+    # 4 paths
     x_edge, y_edge = km.rectangle_vertex(km.model['L'], km.model['W'])
-    x_list=np.array([0, 0.5, 1])
-    y_list=np.array([0.5/sqrt(3), 1/sqrt(3), 2/sqrt(3)])
-    a_list = [0.1, 0.5, 2, 5, 10]
     # kappa
     num_kappa = 20
     kappa_list = np.linspace(0.01, 2, num_kappa)
-    iarea = -1
     
-    for axis, fixed_axis, fixed_list, edge_limit, edge_name in [('x', 'y', y_list, x_edge, 'right'),('y', 'x', x_list, y_edge, 'upper')]:
-        for fixed_value in fixed_list:
-            iarea += 1
-            for ih, h in enumerate(h_list):
-                plt.figure()
-                plt.grid(True, linestyle='--', alpha=0.4)
-                km.model['h'] = h
-                sys = km.model_builder()
-                haldane = HALDANE(sys, calculate_expectation=False)
-                localizer = Localizer(haldane)
-                for ia, a in enumerate(a_list):
-                    tmp = haldane.expectation[ia, iarea]
-                    plt.plot([0, 2], [tmp, tmp], linewidth=1, alpha=0.8, label=f'a={a}')
-                plt.legend()
-                plt.plot([0, 2], [edge_limit, edge_limit], linewidth=1, alpha=0.4, linestyle=':', color='black')
-
-                def binary_search(f, low, high, xtol):
-                    while (high - low) > xtol:
-                        mid = (low + high) / 2
-                        if f(mid) == 1 and f(high) == 0:
-                            low = mid
-                        else:
-                            high = mid
-                    return (low + high) / 2
-                def local_chern_number(val, axis, kappa):
-                    if axis == 'x':
-                        L = localizer.get_localizer(x=val, y=fixed_value, kappa=kappa)
-                    else:  # axis == 'y'
-                        L = localizer.get_localizer(x=fixed_value, y=val, kappa=kappa)
-                    evals = np.linalg.eigvalsh(L)
-                    return (np.count_nonzero(evals > 0) - np.count_nonzero(evals < 0)) / 2
+    if storage_info:
+        for axis, fixed_axis, fixed_value, edge_limit, edge_name in [('x', 'y', 0.5/sqrt(3), x_edge, 'HA1'),
+                                                                    ('x', 'y', 1/sqrt(3), x_edge, 'HA2'),
+                                                                    ('y', 'x', 0, y_edge, 'VA1'),
+                                                                    ('y', 'x', 0.5, y_edge, 'VA2')]:
+            km.model['h'] = 0.2
+            sys = km.model_builder()
+            haldane = HALDANE(sys)
+            localizer = Localizer(haldane)
+                
+            def binary_search(f, low, high, xtol):
+                while (high - low) > xtol:
+                    mid = (low + high) / 2
+                    if f(mid) == 1 and f(high) == 0:
+                        low = mid
+                    else:
+                        high = mid
+                return (low + high) / 2
+            def local_chern_number(val, axis, kappa):
+                if axis == 'x':
+                    L = localizer.get_localizer(x=val, y=fixed_value, kappa=kappa)
+                else:  # axis == 'y'
+                    L = localizer.get_localizer(x=fixed_value, y=val, kappa=kappa)
+                evals = np.linalg.eigvalsh(L)
+                return (np.count_nonzero(evals > 0) - np.count_nonzero(evals < 0)) / 2
             
-                location_change = np.zeros(num_kappa)
-                if iarea == 3:
-                    location_change = np.load("/Users/ruiqi/Desktop/location_change_0.npy")
-                #for ikappa, kappa in enumerate(kappa_list):
-                 #   if local_chern_number(0,axis,kappa) == local_chern_number(edge_limit,axis,kappa):
-                  #      location_change[ikappa] = 0
-                   # location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-3)
-                #np.save(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/location_change_{iarea}", location_change)
-                #np.save(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/location_change_{iarea}", location_change)
-                plt.scatter(kappa_list, location_change, s=2, alpha=0.6)
-                plt.title(f"{fixed_axis}={fixed_value:.2f}", loc='left')
-                plt.ylabel(axis)
-                plt.xlabel(r'$\kappa$')
-                plt.title(f"{edge_name} edge")
-                plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
-                #plt.savefig(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
-                #plt.show()
-                #plt.close()
-                if iarea == 3:
-                    return
+            location_change = np.zeros(num_kappa)
+            for ikappa, kappa in enumerate(kappa_list):
+                if local_chern_number(0,axis,kappa) == local_chern_number(edge_limit,axis,kappa):
+                    location_change[ikappa] = 0
+                location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-3)
+            #np.save(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/location_change_{iarea}", location_change)
+            np.save(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{edge_name}", location_change)
+            
+    else:
+        for axis, fixed_axis, fixed_value, edge_limit, edge_name in [('x', 'y', 0.5/sqrt(3), x_edge, 'HA1'),
+                                                                    ('x', 'y', 1/sqrt(3), x_edge, 'HA2'),
+                                                                    ('y', 'x', 0, y_edge, 'VA1'),
+                                                                    ('y', 'x', 0.5, y_edge, 'VA2')]:
+            plt.figure()
+            plt.grid(True, linestyle='--', alpha=0.4)
+            plt.legend()
+            plt.plot([0, 2], [edge_limit, edge_limit], linewidth=1, alpha=0.4, linestyle=':', color='black')
+            location_change = np.load(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{edge_name}")
+            plt.scatter(kappa_list, location_change, s=2, alpha=0.6)
+            plt.title(f"{edge_name} {fixed_axis}={fixed_value:.2f}", loc='left')
+            plt.ylabel(axis)
+            plt.xlabel(r'$\kappa$')
+            #plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
+            #plt.savefig(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
+            plt.show()
+            #plt.close()
                 
     
 np.set_printoptions(suppress=True)
 #eigenvalues_change(km.HALDANE)
-edgestate_location_2d()
+edgestate_location_2d(storage_info=True)
 #edgestate_location_1d()
 
 #km.change_model(km.SSH, km.NONE)
