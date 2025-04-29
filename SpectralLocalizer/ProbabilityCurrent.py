@@ -821,7 +821,7 @@ def read_data():
                 #center = negative_energies[np.argmin(np.abs(negative_energies))]
                 gaussian_values = np.exp(-(energies-0)**2 / (2 * sigma**2))
                 gaussian_values[energies>=0] = 0
-                gaussian_values /= np.sum(gaussian_values)
+                gaussian_values = gaussian_values*np.sqrt(2/np.pi)/sigma
                 
                 currents = storage.read_currents(h_i)
                 sum_currents[h_i] = np.array([np.dot(currents[j], gaussian_values) for j in range(storage.num_edges)])
@@ -970,11 +970,11 @@ def read_data():
                 h_list = np.linspace(0.0, 2.0, 200)
             else:
                 h_list = np.linspace(0.0, 2.0, 400)
-            plt.plot(h_list, big_flow_list[3, ia], label=rf'$L={L}$', color=colors[iL], linewidth=1.5, alpha = 0.7)
+            plt.plot(h_list, big_flow_list[3, ia]/(2/L), label=rf'$L={L}$', color=colors[iL], linewidth=1.5, alpha = 0.7)
         plt.xlabel(r'$h$')
         plt.ylabel(r'$I_{\text{circ}}$')
         plt.xticks(np.arange(0, 2.1, 0.1))
-        plt.ylim(-0.08, 0.08)
+        #plt.ylim(-0.08, 0.08)
         plt.legend(loc='upper center',frameon=False,labelspacing=0.7)
         ax = plt.gca()
         ax.text(0.02, 0.98, rf"$a={a_list[ia]}$", transform=ax.transAxes, fontsize=10, verticalalignment='top')
@@ -1161,7 +1161,8 @@ def read_data():
     #all_plot()
     #cancel_out_plot()
     #new_cancel_out_plot()
-    #storage_info()
+    storage_info()
+    #currents_diffsize_two_visualizations_plot_plot()
     #currents_diffsize_correction()
     #new_cancel_out_plot_correction()
 

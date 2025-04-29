@@ -279,7 +279,7 @@ def edgestate_location_2d():
     kappa_list = np.linspace(0.01, 2, num_kappa)
     iarea = -1
     
-    for axis, fixed_axis, fixed_list, edge_limit, edge_name in [('y', 'x', x_list, y_edge, 'upper'), ('x', 'y', y_list, x_edge, 'right')]:
+    for axis, fixed_axis, fixed_list, edge_limit, edge_name in [('x', 'y', y_list, x_edge, 'right'),('y', 'x', x_list, y_edge, 'upper')]:
         for fixed_value in fixed_list:
             iarea += 1
             for ih, h in enumerate(h_list):
@@ -293,6 +293,7 @@ def edgestate_location_2d():
                     tmp = haldane.expectation[ia, iarea]
                     plt.plot([0, 2], [tmp, tmp], linewidth=1, alpha=0.8, label=f'a={a}')
                 plt.legend()
+                plt.plot([0, 2], [edge_limit, edge_limit], linewidth=1, alpha=0.4, linestyle=':', color='black')
 
                 def binary_search(f, low, high, xtol):
                     while (high - low) > xtol:
@@ -311,21 +312,25 @@ def edgestate_location_2d():
                     return (np.count_nonzero(evals > 0) - np.count_nonzero(evals < 0)) / 2
             
                 location_change = np.zeros(num_kappa)
-                for ikappa, kappa in enumerate(kappa_list):
-                    if local_chern_number(0,axis,kappa) == local_chern_number(edge_limit,axis,kappa):
-                        location_change[ikappa] = 0
-                    location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-3)
-                np.save(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/location_change_{iarea}", location_change)
-                np.save(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/location_change_{iarea}", location_change)
+                if iarea == 3:
+                    location_change = np.load("/Users/ruiqi/Desktop/location_change_0.npy")
+                #for ikappa, kappa in enumerate(kappa_list):
+                 #   if local_chern_number(0,axis,kappa) == local_chern_number(edge_limit,axis,kappa):
+                  #      location_change[ikappa] = 0
+                   # location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-3)
+                #np.save(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/location_change_{iarea}", location_change)
+                #np.save(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/location_change_{iarea}", location_change)
                 plt.scatter(kappa_list, location_change, s=2, alpha=0.6)
                 plt.title(f"{fixed_axis}={fixed_value:.2f}", loc='left')
                 plt.ylabel(axis)
                 plt.xlabel(r'$\kappa$')
                 plt.title(f"{edge_name} edge")
                 plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/zero_kappa/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
-                plt.savefig(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
+                #plt.savefig(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{fixed_axis}_{fixed_value:.2f}_{km.model['L']}.png", dpi=300, bbox_inches='tight')
                 #plt.show()
                 #plt.close()
+                if iarea == 3:
+                    return
                 
     
 np.set_printoptions(suppress=True)
