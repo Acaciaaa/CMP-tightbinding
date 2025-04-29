@@ -388,15 +388,18 @@ def haldane():
         plt.scatter(0, 0, color='red', s=8)
         plt.axhline(0.5/sqrt(3), color='pink',alpha=0.5,linewidth=3)
         plt.axhline(1/sqrt(3), color='pink',alpha=0.5,linewidth=3)
-        plt.axhline(2/sqrt(3), color='pink',alpha=0.5,linewidth=3)
         plt.axvline(0, color='pink',alpha=0.5,linewidth=3)
         plt.axvline(0.5, color='pink',alpha=0.5,linewidth=3)
-        plt.axvline(1, color='pink',alpha=0.5,linewidth=3)
+        plt.text(12.7, 0.5/sqrt(3)-0.1, 'HA1', va='center', ha='left', fontsize=7, color='black')
+        plt.text(12.7, 1/sqrt(3)+0.1, 'HA2', va='center', ha='left', fontsize=7, color='black')
+        plt.text(-0.2, 11.6, 'VA1', va='top', ha='center', fontsize=7, color='black')
+        plt.text(0.5+0.2, 11.6, 'VA2', va='top', ha='center', fontsize=7, color='black')
+
         kwant.plot(sys, ax=ax,site_color=color_sites,site_size=0.1,hop_color=color_hoppings,hop_lw=0.05)
         ax.set_aspect('equal', 'box')
         ax.axis('off')
         plt.tight_layout()
-        plt.savefig(f"/Users/ruiqi/Desktop/haldane_model.png", dpi=300, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/haldane_model.png", dpi=300, bbox_inches='tight')
         #plt.show()
     #draw_model_marker1d()
     #draw_model_localizer()
@@ -492,7 +495,7 @@ plt.rcParams['xtick.labelsize'] = 10
 plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 
-#change_model(DEFECT, SINGLE)
-change_model(HALDANE, NOMASS)
-model['L']=model['W']=25
+change_model(DEFECT, SINGLE)
+#change_model(HALDANE, NOMASS)
+model['L']=model['W']=1
 model_builder()

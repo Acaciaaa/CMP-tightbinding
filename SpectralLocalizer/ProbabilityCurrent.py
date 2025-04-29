@@ -121,7 +121,7 @@ def current_Jr(name, category, ax=None, h=0):
             start, stop, min, max, sigma = args[0], args[1], args[2], args[3], args[4]
             way = f"gaussian_start={start:.2f}_stop={stop:.2f}_sigma={sigma:.2f}"
             gaussian_values = np.exp(-(evals - stop)**2 / (2 * sigma**2)) + np.exp(-(evals - start)**2 / (2 * sigma**2))
-            gaussian_values /= np.max(gaussian_values)
+            #gaussian_values /= np.max(gaussian_values)
             gaussian_values[(evals >= start) & (evals <= stop)] = 1
             if min is not None:
                 way += f"_min={min:.2f}"
@@ -129,6 +129,7 @@ def current_Jr(name, category, ax=None, h=0):
             if max is not None:
                 way += f"_max={max:.2f}"
                 gaussian_values[evals >= max] = 0
+            gaussian_values = gaussian_values*np.sqrt(2/np.pi)/sigma
 
             for i, e in enumerate(gaussian_values):
                 if e > 0:
@@ -258,7 +259,9 @@ def current_Jr(name, category, ax=None, h=0):
     #     sys = model_builder()
     #     find_distribution(sys)
         # draw_distribution()
-    draw_current(ax, h)
+
+    #!!!!!
+    #draw_current(ax, h)
     
     def draw_h_fixed(whichsum):
         h_list = [0.7, 1.3]
@@ -285,7 +288,7 @@ def current_Jr(name, category, ax=None, h=0):
         ax.spines['right'].set_visible(False)
         ax.tick_params(direction='in', which='both')
         ax.minorticks_on()
-        plt.ylim(-0.02, 0.03)
+        plt.ylim(-0.3, 0.64)
         dot_positions = [
             (1.323,r'$d$'),
             (0.866,r'$c$'),
@@ -293,8 +296,8 @@ def current_Jr(name, category, ax=None, h=0):
             (0.5,r'$b$'),
             (0.289, r'$a$')]
         for (x, text) in dot_positions:
-            ax.plot(x, -0.02, 'o', markerfacecolor='black', markeredgecolor='black', markersize=3,clip_on=False)
-            ax.text(x, -0.0185, text, fontsize=11, ha='center', va='center',clip_on=False)
+            ax.plot(x, -0.3, 'o', markerfacecolor='black', markeredgecolor='black', markersize=3,clip_on=False)
+            ax.text(x, -0.277, text, fontsize=11, ha='center', va='center',clip_on=False)
         
         ax_inset = inset_axes(ax, width="50%", height="50%",loc='upper right')
         image = mpimg.imread("/Users/ruiqi/Documents/tmp/currents/r.png")
@@ -970,11 +973,11 @@ def read_data():
                 h_list = np.linspace(0.0, 2.0, 200)
             else:
                 h_list = np.linspace(0.0, 2.0, 400)
-            plt.plot(h_list, big_flow_list[3, ia]/(2/L), label=rf'$L={L}$', color=colors[iL], linewidth=1.5, alpha = 0.7)
+            plt.plot(h_list, big_flow_list[3, ia], label=rf'$L={L}$', color=colors[iL], linewidth=1.5, alpha = 0.7)
         plt.xlabel(r'$h$')
         plt.ylabel(r'$I_{\text{circ}}$')
         plt.xticks(np.arange(0, 2.1, 0.1))
-        #plt.ylim(-0.08, 0.08)
+        plt.ylim(-0.08, 0.08)
         plt.legend(loc='upper center',frameon=False,labelspacing=0.7)
         ax = plt.gca()
         ax.text(0.02, 0.98, rf"$a={a_list[ia]}$", transform=ax.transAxes, fontsize=10, verticalalignment='top')
@@ -1096,35 +1099,35 @@ def read_data():
         plt.xlabel(r'$h$')
         plt.ylabel(r'$I_{\text{circ}}$')
         plt.xticks(np.arange(0, 2.1, 0.1))
-        #plt.ylim(-0.08, 0.08)
+        plt.ylim(-0.56, 0.56)
         plt.legend(loc='upper center',frameon=False,labelspacing=0.7)
         ax = plt.gca()
         ax.text(0.02, 0.98, rf"$a={a_list[ia]}$", transform=ax.transAxes, fontsize=10, verticalalignment='top')
         ax.tick_params(direction='in', which='both')
         ax.minorticks_on()
-        # ax.vlines(0.9, -0.08, 0, linestyles='--', colors='black',linewidth=1,alpha=0.5)
-        # ax.plot(0.9, -0.08, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
+        ax.vlines(0.9, -0.56, 0, linestyles='--', colors='black',linewidth=1,alpha=0.5)
+        ax.plot(0.9, -0.56, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
         
-        # ax_inset = inset_axes(ax, width="45%", height="45%",loc='upper right',bbox_to_anchor=(0, -0.01, 1, 1),bbox_transform=ax.transAxes)
-        # current_Jr(km.DEFECT, km.SINGLE, ax_inset, 1.3)
-        # ax_inset.axis("off")
+        ax_inset = inset_axes(ax, width="45%", height="45%",loc='upper right',bbox_to_anchor=(0, -0.01, 1, 1),bbox_transform=ax.transAxes)
+        current_Jr(km.DEFECT, km.SINGLE, ax_inset, 1.3)
+        ax_inset.axis("off")
         
-        # ax_inset = inset_axes(ax, width="45%", height="45%",loc='lower left',bbox_to_anchor=(0, 0.01, 1, 1),bbox_transform=ax.transAxes)
-        # current_Jr(km.DEFECT, km.SINGLE, ax_inset, 0.7)
-        # ax_inset.axis("off")
+        ax_inset = inset_axes(ax, width="45%", height="45%",loc='lower left',bbox_to_anchor=(0, 0.01, 1, 1),bbox_transform=ax.transAxes)
+        current_Jr(km.DEFECT, km.SINGLE, ax_inset, 0.7)
+        ax_inset.axis("off")
 
-        # ax.annotate(
-        #     '',
-        #     xy=(0.67, -0.073),
-        #     xytext=(0.7, -0.08),
-        #     arrowprops=dict(arrowstyle="->", color='black'))
-        # ax.plot(0.7, -0.08, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
-        # ax.annotate(
-        #     '',
-        #     xy=(1.33, -0.073),
-        #     xytext=(1.3, -0.08),
-        #     arrowprops=dict(arrowstyle="->", color='black'))
-        # ax.plot(1.3, -0.08, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
+        ax.annotate(
+            '',
+            xy=(0.67, -0.52),
+            xytext=(0.7, -0.56),
+            arrowprops=dict(arrowstyle="->", color='black'))
+        ax.plot(0.7, -0.56, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
+        ax.annotate(
+            '',
+            xy=(1.33, -0.52),
+            xytext=(1.3, -0.56),
+            arrowprops=dict(arrowstyle="->", color='black'))
+        ax.plot(1.3, -0.56, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
         
         fig = plt.gcf()
         fig.set_size_inches(10, 6)
@@ -1151,17 +1154,17 @@ def read_data():
         plt.ylabel(r'$I_\text{circ}$')
         plt.legend(frameon=False,loc='lower left')
 
-        # ax_inset = inset_axes(ax, width="35%", height="35%",loc='upper right')
-        # image = mpimg.imread("/Users/ruiqi/Documents/tmp/currents/fig4b_sub.png")
-        # ax_inset.imshow(image)
-        # ax_inset.axis("off")
+        ax_inset = inset_axes(ax, width="35%", height="35%",loc='upper right')
+        image = mpimg.imread("/Users/ruiqi/Documents/tmp/currents/fig4b_sub.png")
+        ax_inset.imshow(image)
+        ax_inset.axis("off")
         plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig4b_correction.png",dpi=300, bbox_inches='tight')
         #plt.show()
 
     #all_plot()
     #cancel_out_plot()
     #new_cancel_out_plot()
-    storage_info()
+    #storage_info()
     #currents_diffsize_two_visualizations_plot_plot()
     #currents_diffsize_correction()
     #new_cancel_out_plot_correction()
@@ -1400,7 +1403,7 @@ plt.rcParams['xtick.labelsize'] = 10
 plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 #write_data()
-read_data()
+#read_data()
 
 #test_triangle()
 #middle_hex()
@@ -1465,4 +1468,4 @@ def draw_distance_with_color():
 #draw_distance_with_letter()
 #draw_distance_with_color()
 
-#current_Jr(km.DEFECT, km.SINGLE)
+current_Jr(km.DEFECT, km.SINGLE)
