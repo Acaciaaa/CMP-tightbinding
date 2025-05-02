@@ -267,7 +267,6 @@ class HALDANE:
             plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/ldos/{energy:.3f}.png", dpi=300, bbox_inches='tight')
             plt.close()
 
-
 def edgestate_location_1d():
     # h
     km.change_model(km.SSH, km.NONE)
@@ -313,13 +312,13 @@ def edgestate_location_2d(storage_info=False):
     x_edge, y_edge = km.rectangle_vertex(km.model['L'], km.model['W'])
     # kappa
     num_kappa = 20
-    kappa_list = [1]#np.linspace(0.01, 2, num_kappa)
+    kappa_list = np.linspace(0.01, 2, num_kappa)
     
     if storage_info:
-        for axis, fixed_axis, fixed_value, edge_limit, edge_name in [#('x', 'y', 0.5/sqrt(3), x_edge, 'HA1'),
-                                                                    #('x', 'y', 1/sqrt(3), x_edge, 'HA2'),
-                                                                    ('y', 'x', 0, y_edge, 'VA1'),]:
-                                                                    #('y', 'x', 0.5, y_edge, 'VA2')]:
+        for axis, fixed_axis, fixed_value, edge_limit, edge_name in [('x', 'y', 0.5/sqrt(3), x_edge, 'HA1'),
+                                                                    ('x', 'y', 1/sqrt(3), x_edge, 'HA2'),
+                                                                    ('y', 'x', 0, y_edge, 'VA1'),
+                                                                    ('y', 'x', 0.5, y_edge, 'VA2')]:
             km.model['h'] = 0.2
             sys = km.model_builder()
             haldane = HALDANE(sys)
@@ -345,42 +344,77 @@ def edgestate_location_2d(storage_info=False):
             for ikappa, kappa in enumerate(kappa_list):
                 if local_chern_number(0,axis,kappa) == local_chern_number(edge_limit,axis,kappa):
                     location_change[ikappa] = 0
-                location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-5)
-                print(location_change[ikappa])
+                location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-3)
+                #print(location_change[ikappa])
             #np.save(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{edge_name}", location_change)
             
     else:
         expectations = np.load("/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/localizer/25/real_expectations.npy")
-        for i, (axis, fixed_axis, fixed_value, edge_limit, edge_name) in enumerate([('x', 'y', 0.5/sqrt(3), x_edge, 'HA1'),
-                                                                    ('x', 'y', 1/sqrt(3), x_edge-0.5, 'HA2'),
-                                                                    ('y', 'x', 0, y_edge, 'VA1'),
-                                                                    ('y', 'x', 0.5, y_edge-0.5/sqrt(3), 'VA2')]):
+        for i, (axis, edge_limit1, edge_limit2, edge_name) in enumerate([('x', x_edge, x_edge-0.5, 'HA'),
+                                                                         ('y', y_edge, y_edge-0.5/sqrt(3), 'VA')]):
             plt.figure()
             plt.grid(True, linestyle='--', alpha=0.4)
-            plt.legend()
-            for (val, label) in [(edge_limit, 'edge'), (expectations[0, i], 'lowest'), 
-                                 (np.mean(expectations[:10, i]), 'avg lowest 10')]:
+            for (val, label) in [(edge_limit1, f'edge {edge_name}1'), (edge_limit2, f'edge {edge_name}2'), 
+                                 ((expectations[0, i*2]+expectations[0, i*2+1])/2, 'lowest')]:
                 plt.plot([0, 2], [val, val], linewidth=1, alpha=0.5, label=label)
+            
+            location_change = np.load(f"/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/localizer/25/{edge_name}1.npy")
+            plt.scatter(kappa_list, location_change, s=2.5, alpha=0.6, color='black', label=f'localizer {edge_name}1')
+            location_change = np.load(f"/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/localizer/25/{edge_name}2.npy")
+            plt.scatter(kappa_list, location_change, s=2.5, alpha=0.6, color='crimson', label=f'localizer {edge_name}2')
             plt.legend()
-            location_change = np.load(f"/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/localizer/25/{edge_name}.npy")
-            plt.scatter(kappa_list, location_change, s=2, alpha=0.6)
             plt.title(edge_name)
-            if i == 0 or i == 1:
-                plt.ylim(x_edge-1, x_edge)
+            if i == 0:
+                plt.ylim(x_edge-1, x_edge+0.1)
             else:
-                plt.ylim(y_edge-2/sqrt(3), y_edge)
+                plt.ylim(y_edge-2/sqrt(3), y_edge+0.1)
             plt.ylabel(axis)
             plt.xlabel(r'$\kappa$')
             plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/localizer_location/{edge_name}.png",dpi=300, bbox_inches='tight')
             plt.close()
                 
 def analyze_psi():
-    return
+    def distribution(dis, name):
+        plt.figure()
+        plt.scatter(np.diag(haldane.X), np.diag(haldane.Y), c=dis, cmap='Reds', s=20, edgecolors='none')#, vmin=0, vmax=0.011)
+        plt.xlabel('x')
+        plt.ylabel('y')
+        plt.tight_layout()
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/psi/{name}.png", dpi=300, bbox_inches='tight')
+        plt.close()
+
+    km.change_model(km.HALDANE, km.NOMASS)
+    km.model['L']=km.model['W']=25
+    km.model['h']=0.2
+    sys = km.model_builder()
+    haldane = HALDANE(sys)
+    localizer = Localizer(haldane)
+    L = localizer.get_localizer(x=0, y=10.87367, kappa=1)
+    eval, evec = eigsh(L, k=1, which='SM', return_eigenvectors=True)#, tol=1e-10)
+    # eval=0.00000162
+    d = haldane.dim
+    psi1, psi2 = evec[:d, 0], evec[d:, 0]
+    psi11, psi12, psi21, psi22 = psi1[:d//2], psi1[d//2:], psi2[:d//2], psi2[d//2:]
+
+    #distribution(np.abs(psi2)**2, 'psi2')
+    #print(np.allclose(np.abs(psi1), np.abs(psi2), rtol=1e-5, atol=1e-8))->True
+    
+    threshold = 0.1
+    mask = np.abs(psi1) > threshold
+    theta = np.degrees(np.mod(np.angle(psi1[mask]) + np.angle(psi2[mask]), 2*pi))
+    
+    psi_tmp = psi1[mask]
+    x=np.diag(haldane.X)[mask]
+    y=np.diag(haldane.Y)[mask]
+    for i, psi in enumerate(psi_tmp):
+        print(abs(psi), np.degrees(np.mod(np.angle(psi), 2*pi)), x[i], y[i])
+    #print(theta)
 
 np.set_printoptions(suppress=True)
 #eigenvalues_change(km.HALDANE)
-edgestate_location_2d(storage_info=True)
+edgestate_location_2d(storage_info=False)
 #edgestate_location_1d()
+#analyze_psi()
 
 #km.change_model(km.SSH, km.NONE)
 # km.change_model(km.HALDANE, km.NOMASS)

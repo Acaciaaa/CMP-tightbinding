@@ -278,6 +278,8 @@ def current_Jr(name, category, ax=None, h=0):
                 multiply_item=magnitude
             elif whichsum == 'J(r)_r':
                 multiply_item = magnitude * sort_r
+            # np.save(f'/Users/ruiqi/Documents/tmp/currents/RKYY/r_{h}.npy', sort_r)
+            # np.save(f'/Users/ruiqi/Documents/tmp/currents/RKYY/currents_{h}.npy', multiply_item)
             plt.plot(sort_r, multiply_item, marker='o', linestyle='-.', markersize=3, label=rf"$h={h}$", color=colors[i], alpha=0.8)
         plt.xlim(0, 6)
         plt.xlabel(r'$r$')
@@ -306,7 +308,7 @@ def current_Jr(name, category, ax=None, h=0):
         plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig4a.png",dpi=300, bbox_inches='tight')
         #plt.show()
         
-    #draw_h_fixed('J(r)')
+    draw_h_fixed('J(r)')
     #draw_h_fixed('J(r)_r')
 
     def draw_r_fixed(r):
