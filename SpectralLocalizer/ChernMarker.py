@@ -85,7 +85,7 @@ class ChernMarker:
     def path_1d(self):
         # direction: y: zigzag->unitcell path; x: armchair->pure A/B path
         # [y, mid(longer)][y, dev(shorter)][x, a][x, b]
-        self.all_paths = [('y', 'mid'),('x', 'a')] #先不要('y', 'dev'), ('x', 'b')
+        self.all_paths = [('y', 'mid'),('x', 'a')]
         self.path_number = len(self.all_paths)
         self.path_pos = []
         tol = 1e-6
@@ -512,11 +512,13 @@ def zoomin(ax):
     ax.set_ylim(-40, 40)
     ax.set_xlim(0.89, 1.11)
 
-def marker_diffsize():
+from GenerateCSV import generate_csv
+def marker_diffsize(ifcsv=False):
     h_list = np.linspace(0, 2, 400)
     region =  0.2
     cmap = plt.get_cmap('viridis')
     colors = [cmap(i) for i in np.linspace(0, 1, 8)][::-1]
+    data_sets = []
     
     plt.figure()
     plt.axhline(0, color='grey', linewidth=1, linestyle='--',alpha=0.5)
@@ -534,7 +536,11 @@ def marker_diffsize():
             C_diag = pstorage.read_C_unit(ih)
             tmp_list[ih] = np.sum(C_diag[mask])
         plt.plot(h_list, tmp_list, label=rf'$L={L}$',color=colors[iL], linewidth=1.5, alpha = 0.7)
+        if ifcsv:
+            data_sets.append(tmp_list)
     
+    if ifcsv:
+        generate_csv('3', data_sets)
     ax = plt.gca()
     ticks = np.arange(0, 2.1, 0.1)
     ax.set_xticks(ticks)
@@ -559,5 +565,5 @@ def marker_diffsize():
     plt.show()
     #plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig3.png",dpi=300, bbox_inches='tight')
 
-marker_diffsize()
+#marker_diffsize(ifcsv=True)
     

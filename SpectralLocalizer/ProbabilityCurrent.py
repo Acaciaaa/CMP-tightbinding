@@ -797,20 +797,20 @@ def read_data():
         for i, edge in enumerate(positions):
             (x2, y2), (x1, y1) = edge
             if threshold1 is not None:
-                if np.sqrt(((x1+x2)/2)**2 + ((y1+y2)/2)**2) < threshold1: #距离小的不要，按中点算
+                if np.sqrt(((x1+x2)/2)**2 + ((y1+y2)/2)**2) < threshold1:
                     continue
             if threshold2 is not None:
-                if np.sqrt(((x1+x2)/2)**2 + ((y1+y2)/2)**2) > threshold2: #距离大的不要，按中点算
+                if np.sqrt(((x1+x2)/2)**2 + ((y1+y2)/2)**2) > threshold2:
                     continue
-            if (x1<0 and y1<0) or (x2<0 and y2<0): #不在第一象限的不要（一条边的例外）
+            if (x1<0 and y1<0) or (x2<0 and y2<0):
                 continue
             head_in_first_quadrant = (x1 >= 0) and (y1 >= 0)
             tail_in_first_quadrant = (x2 >= 0) and (y2 >= 0)
-            if not (head_in_first_quadrant or tail_in_first_quadrant): #不在第一象限不要
+            if not (head_in_first_quadrant or tail_in_first_quadrant):
                 continue
             y1_line = k * x1
             y2_line = k * x2
-            if (y1 > y1_line and y2 < y2_line) or (y1 < y1_line and y2 > y2_line): #有交点
+            if (y1 > y1_line and y2 < y2_line) or (y1 < y1_line and y2 > y2_line):
                 #print(x1,y1,x2,y2)
                 edge_vector = np.array([x2 - x1, y2 - y1])/np.linalg.norm([x2 - x1, y2 - y1])
                 interact[i] = np.dot(edge_vector, line_vector) / np.linalg.norm(line_vector)
@@ -1168,7 +1168,7 @@ def read_data():
     #new_cancel_out_plot()
     #storage_info()
     #currents_diffsize_two_visualizations_plot_plot()
-    #currents_diffsize_correction()
+    currents_diffsize_correction()
     #new_cancel_out_plot_correction()
 
 import sympy as sp
@@ -1470,4 +1470,4 @@ def draw_distance_with_color():
 #draw_distance_with_letter()
 #draw_distance_with_color()
 
-current_Jr(km.DEFECT, km.SINGLE)
+#current_Jr(km.DEFECT, km.SINGLE)

@@ -44,7 +44,7 @@ def get_eigenvalues(name, *args):
     if name == km.SSH:
         localizer = Localizer(SSH(sys, calculate_expectation=False))
     elif name == km.HALDANE:
-        localizer = Localizer(HALDANE(sys, calculate_expectation=False))
+        localizer = Localizer(HALDANE(sys))
         
     results = np.zeros((len(x_list),len(y_list),len(kappa_list),num_eigvals))
     for ix, x in enumerate(x_list):
@@ -70,7 +70,7 @@ def eigenvalues_change(name):
         #x_list=np.linspace(x_edge-2,x_edge,num=num_x)
         x_list=np.linspace(0,x_edge,num=num_x)
         # kappa
-        kappa_list = np.array([2.0])#0.01,0.1,0.5,1.0,2.0,3.0])
+        kappa_list = np.array([-0.01, -0.1, -0.5, -1.0, -2.0, -3.0])#0.01,0.1,0.5,1.0,2.0,3.0])
         # num_eigvals
         num_eigvals = 10
     elif name == km.SSH:
@@ -99,7 +99,8 @@ def eigenvalues_change(name):
             plt.title(rf"$\kappa={kappa}$", loc='left')
             plt.xlabel('x')
             plt.ylabel('localizer eigenvalues')
-            plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/localizer_visualization/{kappa}.png", dpi=300, bbox_inches='tight')
+            #plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/localizer_visualization/{kappa}.png", dpi=300, bbox_inches='tight')
+            #plt.savefig(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{kappa}.png", dpi=300, bbox_inches='tight')
             #plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/ssh/localizer_visualization/{kappa}.png", dpi=300, bbox_inches='tight')
             #plt.show()
             #plt.close()
@@ -196,7 +197,7 @@ class HALDANE:
         energies, states = custom_sort(evals, evecs)
         
         low_energies = np.zeros(23)
-        expectations = np.zeros((23, 4))
+        expectations = np.zeros((23, 2))
         selected_index = 0
         for i, energy in enumerate(energies):
             if abs(energy) > 1:
@@ -206,13 +207,14 @@ class HALDANE:
             low_energies[selected_index] = energy
             psi = states[:, i]
 
-            for iarea, (fixed_point, edge_name) in enumerate([(0.5/sqrt(3), 'HA1'), (1/sqrt(3), 'HA2'), (0, 'VA1'), (0.5, 'VA2')]):
+            for iarea, (p1, p2, edge_name) in enumerate([(0.5/sqrt(3), 1/sqrt(3), 'HA'), 
+                                                              (0, 0.5, 'VA')]):
                 if edge_name[0] == 'H':
-                    mask = (np.abs(y_positions - fixed_point) < 1e-3) & (x_positions > 0)
+                    mask = ((np.abs(y_positions - p1) < 1e-3) | (np.abs(y_positions - p2) < 1e-3)) & (x_positions > 0)
                     P = np.diag(mask)
                     numerator = np.vdot(psi, P @ self.X @ P @ psi)
                 else:
-                    mask = (np.abs(x_positions - fixed_point) < 1e-3) & (y_positions > 0)
+                    mask = ((np.abs(x_positions - p1) < 1e-3) | (np.abs(x_positions - p2) < 1e-3)) & (y_positions > 0)
                     P = np.diag(mask)
                     numerator = np.vdot(psi, P @ self.Y @ P @ psi)
                 
@@ -270,10 +272,10 @@ class HALDANE:
 def edgestate_location_1d():
     # h
     km.change_model(km.SSH, km.NONE)
-    km.model['L']=10
+    km.model['L']=50
     h_list = np.array([0.5])
     # kappa
-    num_kappa = 200
+    num_kappa = 20
     kappa_list = np.linspace(0.01, 2, num_kappa)
     
     for ih, h in enumerate(h_list):
@@ -285,7 +287,8 @@ def edgestate_location_1d():
         localizer = Localizer(ssh)
         
         # TODO: 还有显著性的问题
-        plt.axhline(ssh.w, color='red', linewidth=1,alpha=0.8)
+        plt.plot([0, 2], [ssh.w, ssh.w], linewidth=1.5, alpha=0.6, label=r'$\langle x \rangle$ of edge state', color='black')
+        plt.plot([0, 2], [0, 0], linewidth=1.5, alpha=0.6, label=r'edge', color='royalblue', linestyle='--')
         location_change = np.zeros(num_kappa)
         
         def local_chern_number(x):
@@ -296,12 +299,13 @@ def edgestate_location_1d():
         for ikappa, kappa in enumerate(kappa_list):
             result = minimize_scalar(lambda x: abs(local_chern_number(x)), bounds=(0, 1), method='bounded', options={'xatol': 1e-10})
             location_change[ikappa] = result.x
-        plt.scatter(kappa_list, location_change, s=2, alpha=0.6)
-        plt.ylabel('location(x)')
-        #plt.ylim(0, 0.5)
+        plt.plot(kappa_list, location_change, marker='o', linestyle='-', markersize=3, linewidth=0,
+                 label=r"localizer ZC position", color='royalblue', alpha=0.8)
+        plt.ylabel(r'x')
+        plt.legend()
+        plt.ylim(-0.05, 0.75)
         plt.xlabel(r'$\kappa$')
-        plt.show()
-        #plt.savefig(f"/Users/ruiqixu/Desktop/kappa/localizer numerical/ssh/localizer location.png", dpi=300, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/ssh/localizer location.png", dpi=300, bbox_inches='tight')
         plt.close()
         
 def edgestate_location_2d(storage_info=False):
@@ -315,10 +319,10 @@ def edgestate_location_2d(storage_info=False):
     kappa_list = np.linspace(0.01, 2, num_kappa)
     
     if storage_info:
-        for axis, fixed_axis, fixed_value, edge_limit, edge_name in [('x', 'y', 0.5/sqrt(3), x_edge, 'HA1'),
-                                                                    ('x', 'y', 1/sqrt(3), x_edge, 'HA2'),
-                                                                    ('y', 'x', 0, y_edge, 'VA1'),
-                                                                    ('y', 'x', 0.5, y_edge, 'VA2')]:
+        for axis, fixed_axis, fixed_value, edge_limit, edge_name in [#('x', 'y', 0.5/sqrt(3), x_edge, 'HA1'),
+                                                                    #('x', 'y', 1/sqrt(3), x_edge, 'HA2'),
+                                                                    ('y', 'x', 0, y_edge, 'VA1')]:#,
+                                                                    #('y', 'x', 0.5, y_edge, 'VA2')]:
             km.model['h'] = 0.2
             sys = km.model_builder()
             haldane = HALDANE(sys)
@@ -344,77 +348,98 @@ def edgestate_location_2d(storage_info=False):
             for ikappa, kappa in enumerate(kappa_list):
                 if local_chern_number(0,axis,kappa) == local_chern_number(edge_limit,axis,kappa):
                     location_change[ikappa] = 0
-                location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-3)
-                #print(location_change[ikappa])
+                location_change[ikappa] = binary_search(lambda v: local_chern_number(v, axis, kappa), 0, edge_limit, xtol=1e-5)
+                print(location_change[ikappa])
             #np.save(f"/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{edge_name}", location_change)
             
     else:
         expectations = np.load("/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/localizer/25/real_expectations.npy")
-        for i, (axis, edge_limit1, edge_limit2, edge_name) in enumerate([('x', x_edge, x_edge-0.5, 'HA'),
-                                                                         ('y', y_edge, y_edge-0.5/sqrt(3), 'VA')]):
+        for i, (axis, edge_limit1, edge_limit2, edge_name) in enumerate([('x', x_edge, x_edge-0.5, 'H'),
+                                                                         ('y', y_edge, y_edge-0.5/sqrt(3), 'V')]):
             plt.figure()
             plt.grid(True, linestyle='--', alpha=0.4)
-            for (val, label) in [(edge_limit1, f'edge {edge_name}1'), (edge_limit2, f'edge {edge_name}2'), 
-                                 ((expectations[0, i*2]+expectations[0, i*2+1])/2, 'lowest')]:
-                plt.plot([0, 2], [val, val], linewidth=1, alpha=0.5, label=label)
+            for (val, label, color, style) in [(edge_limit1,f'edge {edge_name}1','crimson', '--'), 
+                                        (edge_limit2,f'edge {edge_name}2','royalblue', '--'), 
+                                        (expectations[0, i],r'$\langle x \rangle$ of edge state','black', '-')]:
+                plt.plot([0, 2], [val, val], linewidth=1.5, alpha=0.6, label=label, color=color, linestyle=style)
             
             location_change = np.load(f"/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/localizer/25/{edge_name}1.npy")
-            plt.scatter(kappa_list, location_change, s=2.5, alpha=0.6, color='black', label=f'localizer {edge_name}1')
+            plt.plot(kappa_list, location_change, marker='o', linestyle='-', markersize=3, linewidth=0,
+                 label=rf"localizer ZC position {edge_name}1", color='crimson', alpha=0.8)
             location_change = np.load(f"/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/localizer/25/{edge_name}2.npy")
-            plt.scatter(kappa_list, location_change, s=2.5, alpha=0.6, color='crimson', label=f'localizer {edge_name}2')
+            plt.plot(kappa_list, location_change, marker='o', linestyle='-', markersize=3, linewidth=0,
+                 label=rf"localizer ZC position {edge_name}2", color='royalblue', alpha=0.8)
             plt.legend()
-            plt.title(edge_name)
-            if i == 0:
-                plt.ylim(x_edge-1, x_edge+0.1)
-            else:
-                plt.ylim(y_edge-2/sqrt(3), y_edge+0.1)
+            plt.gca().invert_yaxis()
+            plt.ylim(edge_limit1+0.05, edge_limit1-0.75)
+            tick_vals = [edge_limit1 - 0.1 * i for i in range(8)]
+            tick_labels = [f"{0.1 * i:.1f}" for i in range(8)]
+            plt.yticks(ticks=tick_vals, labels=tick_labels)
             plt.ylabel(axis)
             plt.xlabel(r'$\kappa$')
             plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/localizer_location/{edge_name}.png",dpi=300, bbox_inches='tight')
             plt.close()
-                
-def analyze_psi():
-    def distribution(dis, name):
-        plt.figure()
-        plt.scatter(np.diag(haldane.X), np.diag(haldane.Y), c=dis, cmap='Reds', s=20, edgecolors='none')#, vmin=0, vmax=0.011)
-        plt.xlabel('x')
-        plt.ylabel('y')
-        plt.tight_layout()
-        plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/psi/{name}.png", dpi=300, bbox_inches='tight')
-        plt.close()
 
+from matplotlib.colors import hsv_to_rgb         
+def analyze_psi():
     km.change_model(km.HALDANE, km.NOMASS)
     km.model['L']=km.model['W']=25
+    x_edge, y_edge = km.rectangle_vertex(km.model['L'], km.model['W'])
     km.model['h']=0.2
     sys = km.model_builder()
     haldane = HALDANE(sys)
     localizer = Localizer(haldane)
-    L = localizer.get_localizer(x=0, y=10.87367, kappa=1)
+    ZC = [(10.87367, 1), (10.90109, 0.1), (10.68801, 0.01), (10.68801, -0.01), (10.6707576, 0.01)]
+    #eval=0.00000162, 0.0000003, 0.00000005
+    ikappa=0
+    L = localizer.get_localizer(x=0, y=ZC[ikappa][0], kappa=ZC[ikappa][1])
     eval, evec = eigsh(L, k=1, which='SM', return_eigenvectors=True)#, tol=1e-10)
-    # eval=0.00000162
+    print(eval)
     d = haldane.dim
     psi1, psi2 = evec[:d, 0], evec[d:, 0]
-    psi11, psi12, psi21, psi22 = psi1[:d//2], psi1[d//2:], psi2[:d//2], psi2[d//2:]
 
-    #distribution(np.abs(psi2)**2, 'psi2')
-    #print(np.allclose(np.abs(psi1), np.abs(psi2), rtol=1e-5, atol=1e-8))->True
+    #print(np.allclose(np.abs(psi1), np.abs(psi2), rtol=1e-5, atol=1e-8))#->True
     
-    threshold = 0.1
+    threshold = 1e-2 * np.max(np.abs(psi1))
     mask = np.abs(psi1) > threshold
-    theta = np.degrees(np.mod(np.angle(psi1[mask]) + np.angle(psi2[mask]), 2*pi))
+    # phase shift
+    maskA = np.abs(psi1[:d//2]) > threshold
+    maskB = np.abs(psi1[d//2:]) > threshold
+    phase_diff = np.angle(psi1[:d//2][maskA] * psi2[:d//2][maskA])
+    global_phase = np.mean(phase_diff)
+    phase_std = np.std(phase_diff)
+    print(global_phase, phase_std)
+    psi1 = psi1 * np.exp(1j*(-global_phase/2))
+    psi2 = psi2 * np.exp(1j*(-global_phase/2))
+    psi11, psi12, psi21, psi22 = psi1[:d//2], psi1[d//2:], psi2[:d//2], psi2[d//2:]
+    print(np.allclose(psi11[maskA], np.conj(psi21[maskA]), rtol=1e-5, atol=1e-8))#->True
+    print(np.allclose(psi12[maskB], -np.conj(psi22[maskB]), rtol=1e-5, atol=1e-8))#->True
     
-    psi_tmp = psi1[mask]
-    x=np.diag(haldane.X)[mask]
-    y=np.diag(haldane.Y)[mask]
-    for i, psi in enumerate(psi_tmp):
-        print(abs(psi), np.degrees(np.mod(np.angle(psi), 2*pi)), x[i], y[i])
-    #print(theta)
+    def draw_phase():
+        x=np.diag(haldane.X)[mask]
+        y=np.diag(haldane.Y)[mask]
+        psi=psi2
+        amplitude = np.abs(psi[mask])
+        phase = np.angle(psi[mask])
+        phase_deg = np.degrees(phase)
+        plt.figure(figsize=(8, 6))
+        plt.scatter(x, y, c=amplitude, cmap='Blues', s=40, edgecolors='silver')#, vmin=0, vmax=0.011)
+        for xi, yi, deg in zip(x, y, phase_deg):
+            plt.text(xi, yi-0.35, f"{deg:.0f}", fontsize=7, ha='center', va='center', color='black')
+        #plt.axis('equal')
+        e=0.2 
+        plt.xlim(-x_edge-0.2, x_edge+0.2)
+        plt.ylim(-y_edge-0.2, y_edge+0.2)
+        plt.tight_layout()
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/psi/{ZC[ikappa][1]}/psi2_.png", dpi=300, bbox_inches='tight')
+        #plt.show()
+    #draw_phase()
 
 np.set_printoptions(suppress=True)
 #eigenvalues_change(km.HALDANE)
-edgestate_location_2d(storage_info=False)
+#edgestate_location_2d(storage_info=False)
 #edgestate_location_1d()
-#analyze_psi()
+analyze_psi()
 
 #km.change_model(km.SSH, km.NONE)
 # km.change_model(km.HALDANE, km.NOMASS)
@@ -423,7 +448,7 @@ edgestate_location_2d(storage_info=False)
 # km.model['h']=0.2
 # sys=km.model_builder()
 # haldane = HALDANE(sys)
-# haldane.draw_expectation()
+# haldane.calculate_expectation()
 # ssh = SSH(sys, calculate_expectation=True)
 # print(ssh.delta/(ssh.l/2-ssh.w))
 
