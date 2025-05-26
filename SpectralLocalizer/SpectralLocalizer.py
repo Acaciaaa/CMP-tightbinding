@@ -316,12 +316,13 @@ def edgestate_location_2d(storage_info=False):
     x_edge, y_edge = km.rectangle_vertex(km.model['L'], km.model['W'])
     # kappa
     num_kappa = 20
-    kappa_list = np.linspace(0.01, 2, num_kappa)
+    kappa_list = [0.01]#np.linspace(0.01, 2, num_kappa)
     
     if storage_info:
-        for axis, fixed_axis, fixed_value, edge_limit, edge_name in [#('x', 'y', 0.5/sqrt(3), x_edge, 'HA1'),
+        for axis, fixed_axis, fixed_value, edge_limit, edge_name in [('x', 'y', 0, x_edge, 'H0')]:
+        #[('x', 'y', 0.5/sqrt(3), x_edge, 'HA1')]:
                                                                     #('x', 'y', 1/sqrt(3), x_edge, 'HA2'),
-                                                                    ('y', 'x', 0, y_edge, 'VA1')]:#,
+                                                                    #('y', 'x', 0, y_edge, 'VA1')]:#,
                                                                     #('y', 'x', 0.5, y_edge, 'VA2')]:
             km.model['h'] = 0.2
             sys = km.model_builder()
@@ -382,43 +383,9 @@ def edgestate_location_2d(storage_info=False):
 
 from matplotlib.colors import hsv_to_rgb         
 def analyze_psi():
-    km.change_model(km.HALDANE, km.NOMASS)
-    km.model['L']=km.model['W']=25
-    x_edge, y_edge = km.rectangle_vertex(km.model['L'], km.model['W'])
-    km.model['h']=0.2
-    sys = km.model_builder()
-    haldane = HALDANE(sys)
-    localizer = Localizer(haldane)
-    ZC = [(10.87367, 1), (10.90109, 0.1), (10.68801, 0.01), (10.68801, -0.01), (10.6707576, 0.01)]
-    #eval=0.00000162, 0.0000003, 0.00000005
-    ikappa=0
-    L = localizer.get_localizer(x=0, y=ZC[ikappa][0], kappa=ZC[ikappa][1])
-    eval, evec = eigsh(L, k=1, which='SM', return_eigenvectors=True)#, tol=1e-10)
-    print(eval)
-    d = haldane.dim
-    psi1, psi2 = evec[:d, 0], evec[d:, 0]
-
-    #print(np.allclose(np.abs(psi1), np.abs(psi2), rtol=1e-5, atol=1e-8))#->True
-    
-    threshold = 1e-2 * np.max(np.abs(psi1))
-    mask = np.abs(psi1) > threshold
-    # phase shift
-    maskA = np.abs(psi1[:d//2]) > threshold
-    maskB = np.abs(psi1[d//2:]) > threshold
-    phase_diff = np.angle(psi1[:d//2][maskA] * psi2[:d//2][maskA])
-    global_phase = np.mean(phase_diff)
-    phase_std = np.std(phase_diff)
-    print(global_phase, phase_std)
-    psi1 = psi1 * np.exp(1j*(-global_phase/2))
-    psi2 = psi2 * np.exp(1j*(-global_phase/2))
-    psi11, psi12, psi21, psi22 = psi1[:d//2], psi1[d//2:], psi2[:d//2], psi2[d//2:]
-    print(np.allclose(psi11[maskA], np.conj(psi21[maskA]), rtol=1e-5, atol=1e-8))#->True
-    print(np.allclose(psi12[maskB], -np.conj(psi22[maskB]), rtol=1e-5, atol=1e-8))#->True
-    
-    def draw_phase():
+    def draw_phase(psi, which):
         x=np.diag(haldane.X)[mask]
         y=np.diag(haldane.Y)[mask]
-        psi=psi2
         amplitude = np.abs(psi[mask])
         phase = np.angle(psi[mask])
         phase_deg = np.degrees(phase)
@@ -428,12 +395,70 @@ def analyze_psi():
             plt.text(xi, yi-0.35, f"{deg:.0f}", fontsize=7, ha='center', va='center', color='black')
         #plt.axis('equal')
         e=0.2 
+        plt.title(f"{eval[0]:.6f}", loc='left')
         plt.xlim(-x_edge-0.2, x_edge+0.2)
         plt.ylim(-y_edge-0.2, y_edge+0.2)
         plt.tight_layout()
-        plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/psi/{ZC[ikappa][1]}/psi2_.png", dpi=300, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/psi/{ZC_up[ikappa][1]}/psi{which}_{delta_y:.2f}.png", dpi=300, bbox_inches='tight')
         #plt.show()
-    #draw_phase()
+    def draw_phase_subtract():
+        x=np.diag(haldane.X)[mask]
+        y=np.diag(haldane.Y)[mask]
+        amplitude = np.abs(psi1[mask])
+        phase = np.angle(psi1[mask]/psi2[mask])
+        phase_deg = np.degrees(phase)
+        plt.figure(figsize=(8, 6))
+        plt.scatter(x, y, c=amplitude, cmap='Blues', s=40, edgecolors='silver')#, vmin=0, vmax=0.011)
+        for xi, yi, deg in zip(x, y, phase_deg):
+            plt.text(xi, yi-0.35, f"{deg:.0f}", fontsize=7, ha='center', va='center', color='black')
+        #plt.axis('equal')
+        e=0.2 
+        plt.title(f"h={km.model['h']} eval={eval[0]:.6f}", loc='left')
+        plt.xlim(-x_edge-0.2, x_edge+0.2)
+        plt.ylim(-y_edge-0.2, y_edge+0.2)
+        plt.tight_layout()
+        plt.savefig(f"/Users/ruiqi/Desktop/psi1_psi2_{delta_y}_{km.model['h']}_{ZC_right[ikappa][0]}.png", dpi=300, bbox_inches='tight')
+        #plt.show()
+    
+    km.change_model(km.HALDANE, km.NOMASS)
+    km.model['L']=km.model['W']=25
+    x_edge, y_edge = km.rectangle_vertex(km.model['L'], km.model['W'])
+    km.model['h']=0.2
+    sys = km.model_builder()
+    haldane = HALDANE(sys)
+    localizer = Localizer(haldane)
+    ZC_up = [(10.87367, 1), (10.90109, 0.1), (10.68801, 0.01), (10.6707576, 0.01)]
+    ZC_right = [(None, 1), (None, 0.1), (-11.9626373, 0.01)]
+    #eval=0.00000162, 0.0000003, 0.00000005
+    for ikappa in [2]:#range(3):
+        for delta_y in [0]:
+            #L = localizer.get_localizer(x=0, y=ZC_up[ikappa][0]+delta_y, kappa=ZC_up[ikappa][1])
+            L = localizer.get_localizer(y=0, x=ZC_right[ikappa][0]+delta_y, kappa=ZC_right[ikappa][1])
+            eval, evec = eigsh(L, k=1, which='SM', return_eigenvectors=True)#, tol=1e-10)
+            d = haldane.dim
+            psi1, psi2 = evec[:d, 0], evec[d:, 0]
+
+            #print(np.allclose(np.abs(psi1), np.abs(psi2), rtol=1e-5, atol=1e-8))#->True
+            
+            threshold = 1e-2 * np.max(np.abs(psi1))
+            mask = np.abs(psi1) > threshold
+            # phase shift
+            maskA = np.abs(psi1[:d//2]) > threshold
+            maskB = np.abs(psi1[d//2:]) > threshold
+            phase_diff = np.angle(psi1[:d//2][maskA] * psi2[:d//2][maskA])
+            global_phase = np.mean(phase_diff)
+            phase_std = np.std(phase_diff)
+            print(global_phase, phase_std)
+            psi1 = psi1 * np.exp(1j*(-global_phase/2))
+            psi2 = psi2 * np.exp(1j*(-global_phase/2))
+            psi11, psi12, psi21, psi22 = psi1[:d//2], psi1[d//2:], psi2[:d//2], psi2[d//2:]
+            print(np.allclose(psi11[maskA], np.conj(psi21[maskA]), rtol=1e-5, atol=1e-8))#->True
+            print(np.allclose(psi12[maskB], -np.conj(psi22[maskB]), rtol=1e-5, atol=1e-8))#->True
+            #draw_phase(psi1, '1')
+            #draw_phase(psi2, '2')
+    
+    
+            draw_phase_subtract()
 
 np.set_printoptions(suppress=True)
 #eigenvalues_change(km.HALDANE)
