@@ -747,10 +747,10 @@ def write_data():
     #change_model(HALDANE, NONTRIVIAL)
     km.change_model(km.DEFECT, km.SINGLE)
     km.model['m']=0
-    L = km.model['L'] = km.model['W'] = 25
+    L = km.model['L'] = km.model['W'] = 37
     sys = km.model_builder()
     H = sys.hamiltonian_submatrix(sparse=False)
-    num_h = 400
+    num_h = 200#400
     num_energies = np.shape(H)[0]
     
     #store positions
@@ -759,7 +759,8 @@ def write_data():
         positions_list.append([sys.sites[head].pos, sys.sites[tail].pos])
     positions = np.array(positions_list)
     num_edges = positions.shape[0]
-    storage = DataStorage(file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/', 
+    storage = DataStorage(file_path=f'/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{L}/',
+                          #file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/', 
                           num_edges=num_edges, num_h=num_h, num_energies=num_energies)
     storage.write_positions(positions)
     
@@ -941,12 +942,14 @@ def read_data():
             plt.close()
     
     def storage_info():
-        L_list = [9, 13, 17, 21, 25, 29]
+        L_list = [33, 37]#[9, 13, 17, 21, 25, 29]
         a_list = [0.5, 1.0, 2.0, 4.0]
         diff_area = [[None, 0.4],[0.4, 0.6],[None, 0.6,], [None, None]]
         for iL, L in enumerate(L_list):
-            storage = DataStorage(file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/')
-            if L == 29:
+            storage = DataStorage(file_path=f'/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{L}/',
+                                  #file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/'
+                                  )
+            if L >= 29:
                 storage.num_h = 200
             else:
                 storage.num_h = 400
@@ -959,7 +962,8 @@ def read_data():
                     sum_currents = get_sumcurrents(storage, GAUSSIAN, a/L)
                     flow_list = np.dot(sum_currents, signs)
                     big_flow_list[iarea,ia]=flow_list
-            np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list_correction.npy', big_flow_list)
+            np.save(f'/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{L}/big_flow_list_correction.npy', big_flow_list)
+            #np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list_correction.npy', big_flow_list)
     
     def currents_diffsize_two_visualizations_plot_plot():
         L_list = [9, 13, 17, 21, 25, 29]
@@ -1166,9 +1170,9 @@ def read_data():
     #all_plot()
     #cancel_out_plot()
     #new_cancel_out_plot()
-    #storage_info()
+    storage_info()
     #currents_diffsize_two_visualizations_plot_plot()
-    currents_diffsize_correction()
+    #currents_diffsize_correction()
     #new_cancel_out_plot_correction()
 
 import sympy as sp
@@ -1405,7 +1409,7 @@ plt.rcParams['xtick.labelsize'] = 10
 plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 #write_data()
-#read_data()
+read_data()
 
 #test_triangle()
 #middle_hex()
