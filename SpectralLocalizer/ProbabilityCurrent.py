@@ -308,7 +308,7 @@ def current_Jr(name, category, ax=None, h=0):
         plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig4a.png",dpi=300, bbox_inches='tight')
         #plt.show()
         
-    draw_h_fixed('J(r)')
+    #draw_h_fixed('J(r)')
     #draw_h_fixed('J(r)_r')
 
     def draw_r_fixed(r):
@@ -744,13 +744,13 @@ def test_current_direction():
     
 def write_data():
     #change_model(DEFECT, CLUSTER)
-    #change_model(HALDANE, NONTRIVIAL)
-    km.change_model(km.DEFECT, km.SINGLE)
+    km.change_model(km.HALDANE, km.NOMASS)
+    #km.change_model(km.DEFECT, km.SINGLE)
     km.model['m']=0
-    L = km.model['L'] = km.model['W'] = 37
+    L = km.model['L'] = km.model['W'] = 25
     sys = km.model_builder()
     H = sys.hamiltonian_submatrix(sparse=False)
-    num_h = 200#400
+    num_h = 1#200#400
     num_energies = np.shape(H)[0]
     
     #store positions
@@ -759,12 +759,13 @@ def write_data():
         positions_list.append([sys.sites[head].pos, sys.sites[tail].pos])
     positions = np.array(positions_list)
     num_edges = positions.shape[0]
-    storage = DataStorage(file_path=f'/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{L}/',
+    storage = DataStorage(#file_path=f'/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{L}/',
                           #file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/', 
+                          file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/haldane/{L}/',
                           num_edges=num_edges, num_h=num_h, num_energies=num_energies)
     storage.write_positions(positions)
     
-    h_list = np.linspace(0.0, 2.0, num_h)
+    h_list = [0.2]#np.linspace(0.0, 2.0, num_h)
     for i, h in enumerate(h_list):
         km.model['h'] = h
         sys = km.model_builder()
@@ -822,12 +823,16 @@ def read_data():
         sum_currents = np.zeros((storage.num_h, storage.num_edges))
         if tag == GAUSSIAN:
             sigma = args[0]
+            storage.num_h=1#
             for h_i in range(storage.num_h):
                 energies = storage.read_energies(h_i)
-                #center = negative_energies[np.argmin(np.abs(negative_energies))]
-                gaussian_values = np.exp(-(energies-0)**2 / (2 * sigma**2))
-                gaussian_values[energies>=0] = 0
-                gaussian_values = gaussian_values*np.sqrt(2/np.pi)/sigma
+                if sigma is None:
+                    gaussian_values = np.ones_like(energies)
+                    gaussian_values[energies>=0] = 0
+                else:
+                    gaussian_values = np.exp(-(energies-0)**2 / (2 * sigma**2))
+                    gaussian_values[energies>=0] = 0
+                    gaussian_values = gaussian_values*np.sqrt(2/np.pi)/sigma
                 
                 currents = storage.read_currents(h_i)
                 sum_currents[h_i] = np.array([np.dot(currents[j], gaussian_values) for j in range(storage.num_edges)])
@@ -845,7 +850,8 @@ def read_data():
                         mask[negative_indices[sorted_indices[state_index]]] = 1
                 currents = storage.read_currents(h_i)
                 sum_currents[h_i] = np.array([np.dot(currents[j], mask) for j in range(storage.num_edges)])
-                
+
+        print(sum_currents)        
         return sum_currents
     
     def hc_plot_exist(ax):
@@ -942,12 +948,13 @@ def read_data():
             plt.close()
     
     def storage_info():
-        L_list = [33, 37]#[9, 13, 17, 21, 25, 29]
+        L_list = [9, 13, 17, 21, 25, 29, 33, 37]
         a_list = [0.5, 1.0, 2.0, 4.0]
         diff_area = [[None, 0.4],[0.4, 0.6],[None, 0.6,], [None, None]]
         for iL, L in enumerate(L_list):
-            storage = DataStorage(file_path=f'/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{L}/',
+            storage = DataStorage(#file_path=f'/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{L}/',
                                   #file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/'
+                                  #file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/haldane/{L}/'
                                   )
             if L >= 29:
                 storage.num_h = 200
@@ -962,7 +969,8 @@ def read_data():
                     sum_currents = get_sumcurrents(storage, GAUSSIAN, a/L)
                     flow_list = np.dot(sum_currents, signs)
                     big_flow_list[iarea,ia]=flow_list
-            np.save(f'/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{L}/big_flow_list_correction.npy', big_flow_list)
+            #print(big_flow_list)
+            #np.save(f'/storage/home/hcoda1/4/rxu366/p-ikimchi3-0/tmp/{L}/big_flow_list_correction.npy', big_flow_list)
             #np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list_correction.npy', big_flow_list)
     
     def currents_diffsize_two_visualizations_plot_plot():
@@ -1088,16 +1096,16 @@ def read_data():
                 plt.close()
 
     def currents_diffsize_correction():
-        L_list = [9, 13, 17, 21, 25, 29]
+        L_list = [9, 13, 17, 21, 25, 29, 33, 37]
         a_list = [0.5, 1.0, 2.0, 4.0]
         ia = 2
         cmap = plt.get_cmap('viridis')
-        colors = [cmap(i) for i in np.linspace(0, 1, 6)][::-1]
+        colors = [cmap(i) for i in np.linspace(0, 1, 8)][::-1]
         plt.figure()
         plt.axhline(0, color='grey', linewidth=1, linestyle='--',alpha=0.5)
         for iL, L in enumerate(L_list):
             big_flow_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list_correction.npy')
-            if L == 29:
+            if L >= 29:
                 h_list = np.linspace(0.0, 2.0, 200)
             else:
                 h_list = np.linspace(0.0, 2.0, 400)
@@ -1138,7 +1146,8 @@ def read_data():
         fig = plt.gcf()
         fig.set_size_inches(10, 6)
         #plt.show()
-        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1b_correction.png",dpi=300, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Desktop/largersize_currents.png",dpi=300, bbox_inches='tight')
+        #plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1b_correction.png",dpi=300, bbox_inches='tight')
 
     def new_cancel_out_plot_correction():
         h_list = np.linspace(0.0, 2.0, 400)
@@ -1170,10 +1179,12 @@ def read_data():
     #all_plot()
     #cancel_out_plot()
     #new_cancel_out_plot()
-    storage_info()
+    #storage_info()
     #currents_diffsize_two_visualizations_plot_plot()
     #currents_diffsize_correction()
     #new_cancel_out_plot_correction()
+    storage = DataStorage(file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/haldane/25/')
+    sum_currents = get_sumcurrents(storage, GAUSSIAN, None)
 
 import sympy as sp
 def one_hex_model():
