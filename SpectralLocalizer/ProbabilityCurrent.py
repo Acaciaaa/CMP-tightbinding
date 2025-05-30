@@ -119,16 +119,11 @@ def current_Jr(name, category, ax=None, h=0):
             
         elif tag == GAUSSIAN:
             start, stop, min, max, sigma = args[0], args[1], args[2], args[3], args[4]
-            way = f"gaussian_start={start:.2f}_stop={stop:.2f}_sigma={sigma:.2f}"
-            gaussian_values = np.exp(-(evals - stop)**2 / (2 * sigma**2)) + np.exp(-(evals - start)**2 / (2 * sigma**2))
-            #gaussian_values /= np.max(gaussian_values)
-            gaussian_values[(evals >= start) & (evals <= stop)] = 1
-            if min is not None:
-                way += f"_min={min:.2f}"
-                gaussian_values[evals <= min] = 0
-            if max is not None:
-                way += f"_max={max:.2f}"
-                gaussian_values[evals >= max] = 0
+            way = f"none"
+            gaussian_values = np.exp(-(evals-0)**2 / (2 * sigma**2))
+            gaussian_values[evals>=0] = 0
+            
+            #->draw_h or draw_current !!!
             gaussian_values = gaussian_values*np.sqrt(2/np.pi)/sigma
 
             for i, e in enumerate(gaussian_values):
@@ -290,7 +285,7 @@ def current_Jr(name, category, ax=None, h=0):
         ax.spines['right'].set_visible(False)
         ax.tick_params(direction='in', which='both')
         ax.minorticks_on()
-        plt.ylim(-0.3, 0.64)
+        plt.ylim(-0.15, 0.32)
         dot_positions = [
             (1.323,r'$d$'),
             (0.866,r'$c$'),
@@ -298,8 +293,8 @@ def current_Jr(name, category, ax=None, h=0):
             (0.5,r'$b$'),
             (0.289, r'$a$')]
         for (x, text) in dot_positions:
-            ax.plot(x, -0.3, 'o', markerfacecolor='black', markeredgecolor='black', markersize=3,clip_on=False)
-            ax.text(x, -0.277, text, fontsize=11, ha='center', va='center',clip_on=False)
+            ax.plot(x, -0.15, 'o', markerfacecolor='black', markeredgecolor='black', markersize=3,clip_on=False)
+            ax.text(x, -0.138, text, fontsize=11, ha='center', va='center',clip_on=False)
         
         ax_inset = inset_axes(ax, width="50%", height="50%",loc='upper right')
         image = mpimg.imread("/Users/ruiqi/Documents/tmp/currents/r.png")
@@ -308,7 +303,7 @@ def current_Jr(name, category, ax=None, h=0):
         plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig4a.png",dpi=300, bbox_inches='tight')
         #plt.show()
         
-    #draw_h_fixed('J(r)')
+    draw_h_fixed('J(r)')
     #draw_h_fixed('J(r)_r')
 
     def draw_r_fixed(r):
@@ -823,7 +818,6 @@ def read_data():
         sum_currents = np.zeros((storage.num_h, storage.num_edges))
         if tag == GAUSSIAN:
             sigma = args[0]
-            storage.num_h=1#
             for h_i in range(storage.num_h):
                 energies = storage.read_energies(h_i)
                 if sigma is None:
@@ -851,7 +845,8 @@ def read_data():
                 currents = storage.read_currents(h_i)
                 sum_currents[h_i] = np.array([np.dot(currents[j], mask) for j in range(storage.num_edges)])
 
-        print(sum_currents)        
+        # print(storage.num_edges, sum_currents.shape)
+        # print(sum_currents[0][np.argpartition(np.abs(sum_currents[0]), -100)[-100:]])        
         return sum_currents
     
     def hc_plot_exist(ax):
@@ -1146,7 +1141,7 @@ def read_data():
         fig = plt.gcf()
         fig.set_size_inches(10, 6)
         #plt.show()
-        plt.savefig(f"/Users/ruiqi/Desktop/largersize_currents.png",dpi=300, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Desktop/largersize_currents1.png",dpi=300, bbox_inches='tight')
         #plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1b_correction.png",dpi=300, bbox_inches='tight')
 
     def new_cancel_out_plot_correction():
@@ -1181,10 +1176,14 @@ def read_data():
     #new_cancel_out_plot()
     #storage_info()
     #currents_diffsize_two_visualizations_plot_plot()
-    #currents_diffsize_correction()
+    currents_diffsize_correction()
     #new_cancel_out_plot_correction()
-    storage = DataStorage(file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/haldane/25/')
-    sum_currents = get_sumcurrents(storage, GAUSSIAN, None)
+
+    # for J_occupied only
+    # storage = DataStorage(file_path=f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/haldane/25/')
+    # positions = storage.read_positions()
+    # storage.num_h=1
+    # sum_currents = get_sumcurrents(storage, GAUSSIAN, None)
 
 import sympy as sp
 def one_hex_model():
@@ -1420,7 +1419,7 @@ plt.rcParams['xtick.labelsize'] = 10
 plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 #write_data()
-read_data()
+#read_data()
 
 #test_triangle()
 #middle_hex()
@@ -1485,4 +1484,4 @@ def draw_distance_with_color():
 #draw_distance_with_letter()
 #draw_distance_with_color()
 
-#current_Jr(km.DEFECT, km.SINGLE)
+current_Jr(km.DEFECT, km.SINGLE)

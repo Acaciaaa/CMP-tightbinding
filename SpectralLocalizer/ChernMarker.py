@@ -425,21 +425,20 @@ plt.rcParams['legend.fontsize'] = 10
 
 def store_hc():
     h_list, h_29_list = np.linspace(0, 2, 400),np.linspace(0, 2, 200)
-    hc_list = np.zeros((14, 4))
-    current_L_list = [9, 13, 17, 21, 25, 29]
+    hc_list = np.zeros((16, 4))
     a_list = [0.5, 1, 2, 4]
-    marker_L_list = [9, 13, 17, 21, 25, 29, 33, 37]
+    L_list = [9, 13, 17, 21, 25, 29, 33, 37]
     edge_list = [0.2, 0.3, 0.4, 0.5]
-    for iL, L in enumerate(current_L_list):
-        big_flow_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list1.npy')
+    for iL, L in enumerate(L_list):
+        big_flow_list = np.load(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/single/{L}/big_flow_list_correction.npy')
         for ia, a in enumerate(a_list):
             crossing_index = np.where(big_flow_list[3, ia] > 0)[0][-1]
-            if L == 29:
+            if L >= 29:
                 zero=(h_29_list[crossing_index]+h_29_list[crossing_index+1])/2
             else:
                 zero=(h_list[crossing_index]+h_list[crossing_index+1])/2
             hc_list[iL, ia] = zero
-    for iL, L in enumerate(marker_L_list):
+    for iL, L in enumerate(L_list):
         pstorage = Cstorage(L)
         marker = ChernMarker(L, L)
         X_diag = np.diag(marker.X)
@@ -453,29 +452,34 @@ def store_hc():
                 tmp_list[ih] = np.sum(C_diag[mask])
             crossing_index = np.where(tmp_list > 0)[0][-1]
             zero=(h_list[crossing_index]+h_list[crossing_index+1])/2
-            hc_list[6+iL, iedge] = zero
+            hc_list[8+iL, iedge] = zero
     np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/hc_list.npy', hc_list)
 
 def hc(ax):
-    current_L_list = [9, 13, 17, 21, 25, 29]
     a_list = [0.5, 1, 2, 4]
-    marker_L_list = [9, 13, 17, 21, 25, 29, 33, 37]
+    L_list = [9, 13, 17, 21, 25, 29, 33, 37]
     edge_list = [0.2, 0.3, 0.4, 0.5]
     hc_list = np.load('/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/hc_list.npy')
     for iedge, edge in enumerate(edge_list):
         if edge == 0.2:
-            ax.plot(marker_L_list, hc_list[6:, iedge], label = rf'edge$={edge}$', marker='o', linestyle='-', color='mediumblue',markersize=3.5,linewidth=2,alpha=1)
-        else:
-            ax.plot(marker_L_list, hc_list[6:, iedge], marker='o', linestyle='--', color='skyblue',markersize=3,linewidth=1,alpha=0.7)
+            continue
+        ax.plot(L_list, hc_list[8:, iedge], marker='o', linestyle='--', color='skyblue',markersize=3,linewidth=1,alpha=0.7)
+    for iedge, edge in enumerate(edge_list):
+        if edge == 0.2:
+            ax.plot(L_list, hc_list[8:, iedge], label = rf'edge$={edge}$', marker='o', linestyle='-', color='mediumblue',markersize=3.5,linewidth=2,alpha=1)
+            break
     for ia, a in enumerate(a_list):
         if a == 2:
-            ax.plot(current_L_list, hc_list[:6, ia], label = rf'$a={a}$', marker='o', linestyle='-', color='crimson',markersize=3.5,linewidth=2,alpha=1)
-        else:
-            ax.plot(current_L_list, hc_list[:6, ia], marker='o', linestyle='--', color='pink',markersize=3,linewidth=1,alpha=0.7)
+            continue
+        ax.plot(L_list, hc_list[:8, ia], marker='o', linestyle='--', color='pink',markersize=3,linewidth=1,alpha=0.7)
+    for ia, a in enumerate(a_list):
+        if a == 2:
+            ax.plot(L_list, hc_list[:8, ia], label = rf'$a={a}$', marker='o', linestyle='-', color='crimson',markersize=3.5,linewidth=2,alpha=1)
+            break        
     ax.tick_params(direction='in', which='both')
     ax.set_xlabel(r"$L$")
     ax.set_ylabel(r"$h_c$")
-    ax.set_xticks(ticks=marker_L_list)
+    ax.set_xticks(ticks=L_list)
     ax.yaxis.set_minor_locator(ticker.AutoMinorLocator())
     ax.spines['top'].set_visible(False)
     ax.spines['right'].set_visible(False)
@@ -562,8 +566,9 @@ def marker_diffsize(ifcsv=False):
     zoomin(ax_inset)
     ax_inset.tick_params(axis='both', labelsize=8)
     
-    plt.show()
-    #plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig3.png",dpi=300, bbox_inches='tight')
+    #plt.show()
+    plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig3.png",dpi=300, bbox_inches='tight')
 
-#marker_diffsize(ifcsv=True)
+#store_hc()
+marker_diffsize(ifcsv=True)
     
