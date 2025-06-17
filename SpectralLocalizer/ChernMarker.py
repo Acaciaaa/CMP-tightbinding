@@ -456,7 +456,7 @@ def store_hc():
     np.save(f'/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/hc_list.npy', hc_list)
 
 def hc(ax):
-    a_list = [0.5, 1, 2, 4]
+    a_list = [0.5, 1, 2.0, 4]
     L_list = [9, 13, 17, 21, 25, 29, 33, 37]
     edge_list = [0.2, 0.3, 0.4, 0.5]
     hc_list = np.load('/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/hc_list.npy')
@@ -474,7 +474,7 @@ def hc(ax):
         ax.plot(L_list, hc_list[:8, ia], marker='o', linestyle='--', color='pink',markersize=3,linewidth=1,alpha=0.7)
     for ia, a in enumerate(a_list):
         if a == 2:
-            ax.plot(L_list, hc_list[:8, ia], label = rf'$a={a}$', marker='o', linestyle='-', color='crimson',markersize=3.5,linewidth=2,alpha=1)
+            ax.plot(L_list, hc_list[:8, ia], label = rf'$\alpha={a}$', marker='o', linestyle='-', color='crimson',markersize=3.5,linewidth=2,alpha=1)
             break        
     ax.tick_params(direction='in', which='both')
     ax.set_xlabel(r"$L$")

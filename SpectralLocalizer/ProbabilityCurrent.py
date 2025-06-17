@@ -124,7 +124,7 @@ def current_Jr(name, category, ax=None, h=0):
             gaussian_values[evals>=0] = 0
             
             #->draw_h or draw_current !!!
-            gaussian_values = gaussian_values*np.sqrt(2/np.pi)/sigma
+            #gaussian_values = gaussian_values*np.sqrt(2/np.pi)/sigma
 
             for i, e in enumerate(gaussian_values):
                 if e > 0:
@@ -256,7 +256,7 @@ def current_Jr(name, category, ax=None, h=0):
         # draw_distribution()
 
     #!!!!!
-    #draw_current(ax, h)
+    draw_current(ax, h)
     
     def draw_h_fixed(whichsum):
         h_list = [0.7, 1.3]
@@ -303,7 +303,7 @@ def current_Jr(name, category, ax=None, h=0):
         plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig4a.png",dpi=300, bbox_inches='tight')
         #plt.show()
         
-    draw_h_fixed('J(r)')
+    #draw_h_fixed('J(r)')
     #draw_h_fixed('J(r)_r')
 
     def draw_r_fixed(r):
@@ -1108,41 +1108,40 @@ def read_data():
         plt.xlabel(r'$h$')
         plt.ylabel(r'$I_{\text{circ}}$')
         plt.xticks(np.arange(0, 2.1, 0.1))
-        plt.ylim(-0.56, 0.56)
-        plt.legend(loc='upper center',frameon=False,labelspacing=0.7)
+        plt.ylim(-0.62, 0.56)
+        plt.legend(loc='upper center',frameon=False,labelspacing=0.5)
         ax = plt.gca()
-        ax.text(0.02, 0.98, rf"$a={a_list[ia]}$", transform=ax.transAxes, fontsize=10, verticalalignment='top')
+        ax.text(0.94, 0.05, rf"$\alpha={a_list[ia]}$", transform=ax.transAxes, fontsize=10, verticalalignment='top')
         ax.tick_params(direction='in', which='both')
         ax.minorticks_on()
-        ax.vlines(0.9, -0.56, 0, linestyles='--', colors='black',linewidth=1,alpha=0.5)
-        ax.plot(0.9, -0.56, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
+        ax.vlines(0.9, -0.62, 0, linestyles='--', colors='black',linewidth=1,alpha=0.5)
+        ax.plot(0.9, -0.62, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
         
-        ax_inset = inset_axes(ax, width="45%", height="45%",loc='upper right',bbox_to_anchor=(0, -0.01, 1, 1),bbox_transform=ax.transAxes)
+        ax_inset = inset_axes(ax, width="45%", height="45%",loc='upper right',bbox_to_anchor=(0, 0, 1, 1),bbox_transform=ax.transAxes)
         current_Jr(km.DEFECT, km.SINGLE, ax_inset, 1.3)
         ax_inset.axis("off")
         
-        ax_inset = inset_axes(ax, width="45%", height="45%",loc='lower left',bbox_to_anchor=(0, 0.01, 1, 1),bbox_transform=ax.transAxes)
+        ax_inset = inset_axes(ax, width="45%", height="45%",loc='lower left',bbox_to_anchor=(0, 0.03, 1, 1),bbox_transform=ax.transAxes)
         current_Jr(km.DEFECT, km.SINGLE, ax_inset, 0.7)
         ax_inset.axis("off")
 
         ax.annotate(
             '',
-            xy=(0.67, -0.52),
-            xytext=(0.7, -0.56),
+            xy=(0.67, -0.58),
+            xytext=(0.7, -0.62),
             arrowprops=dict(arrowstyle="->", color='black'))
-        ax.plot(0.7, -0.56, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
+        ax.plot(0.7, -0.62, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
         ax.annotate(
             '',
-            xy=(1.33, -0.52),
-            xytext=(1.3, -0.56),
+            xy=(1.33, -0.58),
+            xytext=(1.3, -0.62),
             arrowprops=dict(arrowstyle="->", color='black'))
-        ax.plot(1.3, -0.56, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
+        ax.plot(1.3, -0.62, 'o', markerfacecolor='black', markeredgecolor='black', markersize=2,clip_on=False)
         
         fig = plt.gcf()
         fig.set_size_inches(10, 6)
         #plt.show()
-        plt.savefig(f"/Users/ruiqi/Desktop/largersize_currents1.png",dpi=300, bbox_inches='tight')
-        #plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1b_correction.png",dpi=300, bbox_inches='tight')
+        plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1b_correction.png",dpi=300, bbox_inches='tight')
 
     def new_cancel_out_plot_correction():
         h_list = np.linspace(0.0, 2.0, 400)
@@ -1157,7 +1156,7 @@ def read_data():
         y_min, y_max = ax.get_ylim()
         y_max = max(abs(y_min), abs(y_max))
         ax.set_ylim(-y_max, y_max)
-        ax.text(0.02, 0.98, rf"$L={25},\;a={2.0}$", transform=ax.transAxes, fontsize=10, verticalalignment='top')
+        ax.text(0.82, 0.06, rf"$L={25},\;\alpha={2.0}$", transform=ax.transAxes, fontsize=10, verticalalignment='top')
         ax.tick_params(direction='in', which='both')
         ax.minorticks_on()
         plt.xlabel(r'$h$')
@@ -1419,7 +1418,7 @@ plt.rcParams['xtick.labelsize'] = 10
 plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 #write_data()
-#read_data()
+read_data()
 
 #test_triangle()
 #middle_hex()
@@ -1484,4 +1483,4 @@ def draw_distance_with_color():
 #draw_distance_with_letter()
 #draw_distance_with_color()
 
-current_Jr(km.DEFECT, km.SINGLE)
+#current_Jr(km.DEFECT, km.SINGLE)
