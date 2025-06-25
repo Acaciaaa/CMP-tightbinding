@@ -268,7 +268,7 @@ class HALDANE:
             plt.tight_layout()
             plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/ldos/{energy:.3f}.png", dpi=300, bbox_inches='tight')
             plt.close()
-
+import pandas as pd
 def edgestate_location_1d():
     # h
     km.change_model(km.SSH, km.NONE)
@@ -277,6 +277,8 @@ def edgestate_location_1d():
     # kappa
     num_kappa = 20
     kappa_list = np.linspace(0.01, 2, num_kappa)
+    df = pd.DataFrame()
+    df[r'$\kappa$']=kappa_list
     
     for ih, h in enumerate(h_list):
         plt.figure()
@@ -289,6 +291,8 @@ def edgestate_location_1d():
         # TODO: 还有显著性的问题
         plt.plot([0, 2], [ssh.w, ssh.w], linewidth=1.5, alpha=0.6, label=r'$\langle x \rangle$ of edge state', color='black')
         plt.plot([0, 2], [0, 0], linewidth=1.5, alpha=0.6, label=r'edge', color='royalblue', linestyle='--')
+        df[r'$\langle x \rangle$ of edge state']=ssh.w
+        df[r'edge']=0
         location_change = np.zeros(num_kappa)
         
         def local_chern_number(x):
@@ -301,11 +305,14 @@ def edgestate_location_1d():
             location_change[ikappa] = result.x
         plt.plot(kappa_list, location_change, marker='o', linestyle='-', markersize=3, linewidth=0,
                  label=r"localizer ZC position", color='royalblue', alpha=0.8)
+        df[r"localizer ZC position"]=location_change
+        df.to_csv(f"/Users/ruiqi/Documents/tmp/currents/plot data/SSH/V.csv", index=False)
         plt.ylabel(r'x')
         plt.legend()
         plt.ylim(-0.05, 0.75)
         plt.xlabel(r'$\kappa$')
-        plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/ssh/localizer location.png", dpi=300, bbox_inches='tight')
+        #plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/ssh/localizer location.png", dpi=300, bbox_inches='tight')
+        plt.show()
         plt.close()
         
 def edgestate_location_2d(storage_info=False):
@@ -316,7 +323,7 @@ def edgestate_location_2d(storage_info=False):
     x_edge, y_edge = km.rectangle_vertex(km.model['L'], km.model['W'])
     # kappa
     num_kappa = 20
-    kappa_list = [0.01]#np.linspace(0.01, 2, num_kappa)
+    kappa_list = np.linspace(0.01, 2, num_kappa)
     
     if storage_info:
         for axis, fixed_axis, fixed_value, edge_limit, edge_name in [('x', 'y', 0, x_edge, 'H0')]:
@@ -358,18 +365,24 @@ def edgestate_location_2d(storage_info=False):
         for i, (axis, edge_limit1, edge_limit2, edge_name) in enumerate([('x', x_edge, x_edge-0.5, 'H'),
                                                                          ('y', y_edge, y_edge-0.5/sqrt(3), 'V')]):
             plt.figure()
+            df = pd.DataFrame()
+            df[r'$\kappa$']=kappa_list
             plt.grid(True, linestyle='--', alpha=0.4)
             for (val, label, color, style) in [(edge_limit1,f'edge {edge_name}1','crimson', '--'), 
                                         (edge_limit2,f'edge {edge_name}2','royalblue', '--'), 
                                         (expectations[0, i],r'$\langle x \rangle$ of edge state','black', '-')]:
                 plt.plot([0, 2], [val, val], linewidth=1.5, alpha=0.6, label=label, color=color, linestyle=style)
+                df[label]=val
             
             location_change = np.load(f"/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/localizer/25/{edge_name}1.npy")
             plt.plot(kappa_list, location_change, marker='o', linestyle='-', markersize=3, linewidth=0,
                  label=rf"localizer ZC position {edge_name}1", color='crimson', alpha=0.8)
+            df[rf"localizer ZC position {edge_name}1"]=location_change
             location_change = np.load(f"/Users/ruiqi/GaTech Dropbox/Ruiqi Xu/data/localizer/25/{edge_name}2.npy")
             plt.plot(kappa_list, location_change, marker='o', linestyle='-', markersize=3, linewidth=0,
                  label=rf"localizer ZC position {edge_name}2", color='royalblue', alpha=0.8)
+            df[rf"localizer ZC position {edge_name}2"]=location_change
+            df.to_csv(f"/Users/ruiqi/Documents/tmp/currents/plot data/Haldane/{edge_name}.csv", index=False)
             plt.legend()
             plt.gca().invert_yaxis()
             plt.ylim(edge_limit1+0.05, edge_limit1-0.75)
@@ -378,7 +391,8 @@ def edgestate_location_2d(storage_info=False):
             plt.yticks(ticks=tick_vals, labels=tick_labels)
             plt.ylabel(axis)
             plt.xlabel(r'$\kappa$')
-            plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/localizer_location/{edge_name}.png",dpi=300, bbox_inches='tight')
+            #plt.savefig(f"/Users/ruiqi/Documents/tmp/localizer/haldane/localizer_location/{edge_name}.png",dpi=300, bbox_inches='tight')
+            plt.show()
             plt.close()
 
 from matplotlib.colors import hsv_to_rgb         
@@ -460,11 +474,11 @@ def analyze_psi():
     
             draw_phase_subtract()
 
-np.set_printoptions(suppress=True)
+#np.set_printoptions(suppress=True)
 #eigenvalues_change(km.HALDANE)
 #edgestate_location_2d(storage_info=False)
-#edgestate_location_1d()
-analyze_psi()
+edgestate_location_1d()
+#analyze_psi()
 
 #km.change_model(km.SSH, km.NONE)
 # km.change_model(km.HALDANE, km.NOMASS)
