@@ -193,7 +193,7 @@ class ChernMarker:
             plt.axhline(0, color='grey', linestyle='--',alpha=0.5)
             for edge in [0.2, 0.3, 0.4, 0.5]:
                 mask_total = get_mask(edge)
-                for ih in range(num_h):
+                for ih in range(pstorage.num_h):
                     C_diag = pstorage.read_C_unit(ih)
                     total_list[ih] = way(C_diag[mask_total])
                 plt.plot(h_list, total_list, linestyle='-', label = f"{edge:.2f}")
@@ -221,7 +221,7 @@ class ChernMarker:
             ax = plt.gca()
             plt.axhline(0, color='grey', linestyle='--',alpha=0.5)
             mask_total = get_mask(fixed_edge)
-            for ih in range(num_h):
+            for ih in range(pstorage.num_h):
                 C_diag = pstorage.read_C_unit(ih)
                 total_list[ih] = way(C_diag[mask_total])
                 star_list[ih] = way(C_diag[mask_star])
@@ -245,14 +245,14 @@ class ChernMarker:
             # plt.savefig(
             #     f"/Users/ruiqixu/Desktop/kappa/chern marker/{km.model['name']}/total/M2011/region_{way_label}.png", 
             #     dpi=300, bbox_inches='tight')
-        # diff_edge(np.sum)
-        # diff_edge(np.mean)
+        #diff_edge(np.sum)
+        diff_edge(np.mean)
         # diff_region(np.sum)
         # diff_region(np.mean)
         # get_valley_hc()
 
     def draw_marker_1d(self, sys):
-        edges = [0, 1/8, 1/4, 1/2]
+        edges = [0]#, 1/8, 1/4, 1/2]
         for edge in edges:
             allow_range = self.get_allow_range(int(self.L*edge), int(self.W*edge))
             C = self.crosshair_operator(sys, allow_range)
@@ -404,19 +404,19 @@ plt.rcParams['xtick.labelsize'] = 10
 plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 
-#L = 25
-#W = 25
-#marker = ChernMarker(L, W)
-#marker.path_1d()
+L = 25
+W = 25
+marker = ChernMarker(L, W)
+marker.path_1d()
 #km.change_model(km.HALDANE, km.NOMASS)
-#km.change_model(km.DEFECT, km.SINGLE)
-#km.model['L']=L
-#km.model['W']=W
-#km.model['h']=0.5
-#sys=km.model_builder()
+km.change_model(km.DEFECT, km.SINGLE)
+km.model['L']=L
+km.model['W']=W
+#km.model['h']=2.0
+sys=km.model_builder()
 #marker.draw_marker_1d(sys)
 #marker.draw_marker_2d(sys)
-#marker.draw_total()
+marker.draw_total()
 #marker.draw_magnetization_1d(sys)
 #marker.magnetization_phi()
 
@@ -570,5 +570,5 @@ def marker_diffsize(ifcsv=False):
     plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig3.png",dpi=300, bbox_inches='tight')
 
 #store_hc()
-marker_diffsize(ifcsv=True)
+#marker_diffsize(ifcsv=True)
     

@@ -15,7 +15,7 @@ import cmath
 from math import sqrt, pi, sin, cos, dist
 import warnings
 from matplotlib.lines import Line2D
-
+import pandas as pd
 import KwantModel as km
 
 CONTINUEPOINT = 0.1
@@ -161,6 +161,7 @@ def current_Jr(name, category, ax=None, h=0):
         evals, current = pure_current_info(sys)
         way, sum_current = current_filter(evals, current, GAUSSIAN, 0, 0, None, 0, 2/km.model['L'])
         index = -1
+        #for_csv = []
         for tail, head in sys.graph:
             index += 1
             if abs(sum_current[index]) < 0.0001:
@@ -170,6 +171,7 @@ def current_Jr(name, category, ax=None, h=0):
             if np.linalg.norm(start_point) > 4.5:
                 continue
             weight = sum_current[index]
+            #for_csv.append([start_point[0], start_point[1], end_point[0], end_point[1], weight])
             if weight < 0:
                 start_point, end_point = end_point, start_point
                 weight = -weight
@@ -179,7 +181,7 @@ def current_Jr(name, category, ax=None, h=0):
             #if r > 4:
             #    continue
             normalized = (end_point-start_point)/np.linalg.norm(end_point - start_point)
-            arrow_length = normalized * weight * 55
+            arrow_length = normalized * weight * 40 # 55 for fig1, 40 for fig6
             if np.linalg.norm(arrow_length) < 0.2:
                 continue
 
@@ -197,6 +199,15 @@ def current_Jr(name, category, ax=None, h=0):
             ax.add_patch(arrow)
             # if 0<=mid_x<=3 and 0<=mid_y<=3:
             #     ax.text(mid_x, mid_y, f'{weight:.4f}'.lstrip('0').replace('-0.', '-.'), color='red', fontsize=8, ha='center', va='center')
+#         columns = [
+#     "start_point_x",
+#     "start_point_y",
+#     "end_point_x",
+#     "end_point_y",
+#     "non_negligible_current",
+# ]
+#         df = pd.DataFrame(for_csv, columns=columns)
+#         df.to_csv(f"/Users/ruiqi/Desktop/h_{h}.csv", index=False)
         ax.set_xticklabels([])
         ax.set_yticklabels([])
         ax.set_xticks([])
@@ -1175,7 +1186,7 @@ def read_data():
     #new_cancel_out_plot()
     #storage_info()
     #currents_diffsize_two_visualizations_plot_plot()
-    currents_diffsize_correction()
+    #currents_diffsize_correction()
     #new_cancel_out_plot_correction()
 
     # for J_occupied only
@@ -1196,7 +1207,6 @@ def one_hex_model():
     #print(eigenvectors)
     num_h=200
     h_list = np.linspace(0.0, 2.0, num_h)
-    
     fig, ax = plt.subplots()
     thetas = [r'$0$', r'$\pi$', r'$\pi/3$', r'$4\pi/3$', r'$5\pi/3$', r'$2\pi/3$']
     for i in range(6):
@@ -1216,9 +1226,9 @@ def one_hex_model():
     ax.set_xlabel(r'$h$')
     ax.set_ylabel('Energy')
     plt.tight_layout()
-    #plt.show()
-    plt.savefig(f"/Users/ruiqixu/Desktop/toy.png",dpi=fig.dpi, bbox_inches='tight')
-    plt.close()
+    plt.show()
+    # plt.savefig(f"/Users/ruiqixu/Desktop/toy.png",dpi=fig.dpi, bbox_inches='tight')
+    # plt.close()
     
 def middle_hex():
     def if_same_pos(pos1, pos2):
@@ -1256,7 +1266,7 @@ def middle_hex():
     #print(hex_index)
     #print(current_index)
     
-    for h in [0.5, 1, 1.5]:
+    for h in [1.5]:#, 1, 1.5]:
         km.model['h'] = h
         sys = km.model_builder()
         J = kwant.operator.Current(sys)
@@ -1288,9 +1298,9 @@ def middle_hex():
         interval = np.pi/3
         plt.yticks([i * interval for i in range(7)], [r'$0$', r'$\pi/3$', r'$2\pi/3$',r"$\pi$", r'$4\pi/3$', r'$5\pi/3$', r'$2π$'],fontsize=12)
         plt.grid(True, linestyle='--', alpha=0.5)
-        #plt.show()
-        plt.savefig(f"/Users/ruiqixu/Desktop/{h}_phase.png",dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.show()
+        # plt.savefig(f"/Users/ruiqixu/Desktop/{h}_phase.png",dpi=300, bbox_inches='tight')
+        # plt.close()
         
         y_values = np.array([current_info(currents[i]) for i in range(len(sorted_evals))])
         x_axis = sorted_evals
@@ -1310,9 +1320,9 @@ def middle_hex():
         #plt.ylim(-0.03, 0.05)
         plt.xticks(fontsize=12)
         plt.grid(True, linestyle='--', alpha=0.5)
-        #plt.show()
-        plt.savefig(f"/Users/ruiqixu/Desktop/{h}_current.png",dpi=300, bbox_inches='tight')
-        plt.close()
+        plt.show()
+        # plt.savefig(f"/Users/ruiqixu/Desktop/{h}_current.png",dpi=300, bbox_inches='tight')
+        # plt.close()
 
 def current_kwant(sys, num_states = 20, max_E = 0.5):
     H = sys.hamiltonian_submatrix(sparse=False)
@@ -1418,10 +1428,10 @@ plt.rcParams['xtick.labelsize'] = 10
 plt.rcParams['ytick.labelsize'] = 10
 plt.rcParams['legend.fontsize'] = 10
 #write_data()
-read_data()
+#read_data()
 
 #test_triangle()
-#middle_hex()
+#middle_hex() 
 #one_hex_model()
 
 def draw_distance_with_letter():
@@ -1483,4 +1493,8 @@ def draw_distance_with_color():
 #draw_distance_with_letter()
 #draw_distance_with_color()
 
-#current_Jr(km.DEFECT, km.SINGLE)
+#this is for generating the csv data
+for h in [0.7,0.8,0.9,1.0,1.1,1.2,1.3,1.4,1.5]:
+    ax = plt.gca()
+    current_Jr(km.DEFECT, km.SINGLE, ax, h)
+    #plt.show()

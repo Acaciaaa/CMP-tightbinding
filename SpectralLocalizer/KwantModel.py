@@ -171,8 +171,11 @@ def defect_graphene():
         fig, ax = plt.subplots()
         kwant.plot(sys, ax=ax,site_color=color_sites,site_size=0.08,hop_color=color_hoppings,hop_lw=0.05)
         ax.set_aspect('equal', 'box')
-        ax.plot([0, 2.6], [0, 0], color='grey', linewidth=2, linestyle='--')
+        ax.plot([0, 2.8], [0, 0], color='grey', linewidth=2, linestyle='--')
         ax.axis('off')
+        xmin, xmax = ax.get_xlim()
+        right_margin = xmax - 2.8  # 2.8 是你画线的右端点
+        ax.set_xlim(xmin - right_margin, xmax)
         plt.tight_layout() 
         plt.savefig(f"/Users/ruiqi/Documents/tmp/currents/fig1a_sub1.png",dpi=fig.dpi, bbox_inches='tight')
         #plt.show()
@@ -497,5 +500,5 @@ plt.rcParams['legend.fontsize'] = 10
 
 change_model(DEFECT, SINGLE)
 #change_model(HALDANE, NOMASS)
-model['L']=model['W']=1
+model['L']=model['W']=5
 model_builder()
